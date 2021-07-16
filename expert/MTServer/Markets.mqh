@@ -69,6 +69,7 @@ public:
    bool              history(string symbol, ENUM_TIMEFRAMES period, datetime startTime, datetime endTime, string &result);
    bool              subscribeBar(string symbol, ENUM_TIMEFRAMES period);
    bool              subscribeTicker(string symbol);
+   bool              getSymbols(string &result);
   };
 
 //+------------------------------------------------------------------+
@@ -76,6 +77,21 @@ public:
 //+------------------------------------------------------------------+
 void MTMarkets::MTMarkets()
   {
+  }
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+bool MTMarkets::getSymbols(string &result)
+  {
+   int total = SymbolsTotal(false);
+   for(int i = 0; i< total; i++)
+     {
+      string symbol = SymbolName(i, false);
+      StringAdd(result, StringFormat("%s;", symbol));
+     }
+
+   result = StringSubstr(result, 0, StringLen(result)-1);
+   return true;
   }
 //+------------------------------------------------------------------+
 //|                                                                  |
@@ -107,7 +123,7 @@ bool MTMarkets::history(string symbol, ENUM_TIMEFRAMES period, datetime startTim
    for(int i = 0; i < ratesCount; i++)
      {
       StringAdd(result, StringFormat("%s|%g|%g|%g|%g|%d|%d|%d;",
-                                     TimeToString(ratesArray[i].time),
+                                     TimeToString(ratesArray[i].time, TIME_DATE|TIME_MINUTES|TIME_SECONDS),
                                      ratesArray[i].open,
                                      ratesArray[i].high,
                                      ratesArray[i].low,
@@ -116,6 +132,8 @@ bool MTMarkets::history(string symbol, ENUM_TIMEFRAMES period, datetime startTim
                                      ratesArray[i].spread,
                                      ratesArray[i].real_volume));
      }
+
+   result = StringSubstr(result, 0, StringLen(result)-1);
    return true;
   }
 
@@ -140,4 +158,5 @@ bool MTMarkets::subscribeTicker(string symbol)
    this.symbols[size] = symbol;
    return true;
   }
+
 //+------------------------------------------------------------------+

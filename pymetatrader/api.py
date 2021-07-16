@@ -1,10 +1,22 @@
 import zmq
 import queue
+import threading
+import random
+import string
 from datetime import datetime
 from time import sleep
 
 
+def random_id(length=6):
+    return ''.join(random.SystemRandom().choice(string.ascii_uppercase +
+                                                string.digits)
+                   for _ in range(length))
+
+
 class MetaTraderAPI():
+    wait_timeout = 5000
+    waiters = dict()
+
     def __init__(self, host, push_port=32768, pull_port=32769, sub_port=32770):
         self.host = host
         self.push_port = push_port
@@ -46,6 +58,8 @@ class MetaTraderAPI():
         self.poller.register(self.pull_socket, zmq.POLLIN)
         self.poller.register(self.sub_socket, zmq.POLLIN)
 
+        self._t_wait()
+
     def _send(self, socket, data):
         # if self._PUSH_SOCKET_STATUS['state'] == True:
         try:
@@ -66,29 +80,73 @@ class MetaTraderAPI():
 
         return None
 
-    def _wait(self, socket, timeout=1000):
+    def _t_wait(self):
+        t = threading.Thread(target=self._loop_wait, daemon=False)
+        t.start()
+
+    def _loop_wait(self, timeout=1000):
         while True:
             sleep(0.1)
+
             sockets = dict(self.poller.poll(timeout))
-            
             for socket in sockets:
-                try:
-                    msg = self._recv(socket)
-                    if not msg:
-                        break
+                # try:
+                msg = self._recv(socket)
 
-                    datas = msg.split(msg, 1)
-                    action = datas[0]
-                    data = datas[1]
-                    
-                except zmq.error.Again:
-                    pass  # resource temporarily unavailable, nothing to print
-                except ValueError:
-                    pass  # No data returned, passing iteration.
-                except UnboundLocalError:
-                    pass  # _symbol may sometimes get referenced before being assigned.
+                if not msg:
+                    break
 
-    def history(self, symbol, timeframe, start, end):
-        msg = "{};{};{};{};{}".format('history', symbol, timeframe, start, end)
-        self._send(self.push_socket, msg)
-        self._wait(self.push_socket)
+                datas = msg.split("|", 2)
+                print("datas ", datas)
+                id = datas[1]
+                data = datas[2]
+                if id in self.waiters:
+                    self.waiters[id].put(data)
+                else:
+                    print("Abandoned message: ", msg)
+                # except zmq.error.Again:
+                #     pass  # resource temporarily unavailable, nothing to print
+                # except ValueError:
+                #     pass  # No data returned, passing iteration.
+                # except UnboundLocalError:
+                #     pass  # _symbol may sometimes get referenced before being assigned.
+
+    def _request(self, socket, action, msg=''):
+        request_id = random_id()
+        request = "{};{};{}".format(action, request_id, msg)
+        self._send(socket, request)
+
+        q = queue.Queue()
+        self.waiters[request_id] = q
+        return request_id, q
+
+    def _request_and_wait(self, socket, action, msg=''):
+        id, q = self._request(socket, action, msg)
+        try:
+            return q.get(self.wait_timeout)
+        except queue.Empty:
+            del self.waiters[id]
+            raise RuntimeError("No data response")
+
+    # bars
+    def bars(self, symbol, timeframe, start, end):
+        request = "{};{};{};{};{}".format(symbol, timeframe, start, end)
+        data = self._request_and_wait(self.push_socket, 'HISTORY', request)
+        return self._parse_bars(data)
+
+    def _parse_bars(self, data):
+        raws = data.split(';')
+        bars = []
+        for raw in raws:
+            bar = raw.split('|')
+            bar[0] = datetime.strptime(bar[0], '%Y.%m.%d %H:%M:%S')
+            bars.append(bar)
+        return bars
+
+    # symbols
+    def symbols(self):
+        data = self._request_and_wait(self.push_socket, 'SYMBOLS')
+        return self._parse_symbols(data)
+
+    def _parse_symbols(self, data):
+        return data.split(";")

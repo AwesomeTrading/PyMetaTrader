@@ -30,9 +30,10 @@ private:
    bool              status();
    void              checkRequest();
    void              parseRequest(string& message, string& retArray[]);
+   void              reply(Socket& socket, string message);
    void              processRequest(string &compArray[]);
    void              processRequestHistory(string &params[]);
-   void              reply(Socket& socket, string message);
+   void              processRequestSymbols(string &params[]);
 
 public:
                      MTServer();
@@ -80,6 +81,12 @@ bool MTServer::stop(void)
    delete pullSocket;
    delete pubSocket;
    return true;
+  }
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+void MTServer::onTick(void)
+  {
   }
 //+------------------------------------------------------------------+
 //|                                                                  |
@@ -217,9 +224,15 @@ void MTServer::processRequest(string &params[])
   {
    string action = params[0];
 
-   if(action == "history")
+   if(action == "HISTORY")
      {
       this.processRequestHistory(params);
+      return;
+     }
+   if(action == "SYMBOLS")
+     {
+      this.processRequestSymbols(params);
+      return;
      }
   }
 //+------------------------------------------------------------------+
@@ -233,30 +246,38 @@ void MTServer::parseRequest(string& message, string& result[])
    ushort u_sep = StringGetCharacter(sep,0);
    int splits = StringSplit(message, u_sep, result);
   }
-
-//+------------------------------------------------------------------+
-//|                                                                  |
-//+------------------------------------------------------------------+
-void MTServer::processRequestHistory(string &params[])
-  {
-   string symbol = params[1];
-   ENUM_TIMEFRAMES period = GetTimeframe(params[2]);
-   datetime startTime = StringToTime(params[3]);
-   datetime endTime = StringToTime(params[4]);
-   string result = StringFormat("HISTORY|%s|%s|", params[1], params[2]);
-
-   this.markets.history(symbol, period, startTime, endTime, result);
-   this.reply(pushSocket, result);
-   Print(result);
-  }
-
-
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
 void MTServer::reply(Socket& socket, string message)
   {
+   Print("Reply: " + message);
    ZmqMsg msg(message);
    socket.send(msg,true); // NON-BLOCKING
   }
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+void MTServer::processRequestHistory(string &params[])
+  {
+   string symbol = params[2];
+   ENUM_TIMEFRAMES period = GetTimeframe(params[3]);
+   datetime startTime = StringToTime(params[4]);
+   datetime endTime = StringToTime(params[5]);
+   string result = StringFormat("HISTORY|%s|%s|%s|", params[1], params[2], params[3]);
+
+   this.markets.history(symbol, period, startTime, endTime, result);
+   this.reply(pushSocket, result);
+  }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+void MTServer::processRequestSymbols(string &params[])
+  {
+   string result = StringFormat("SYMBOLS|%s|", params[1]);
+   this.markets.getSymbols(result);
+   this.reply(pushSocket, result);
+  }
+
 //+------------------------------------------------------------------+
