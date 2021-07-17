@@ -55,4 +55,17 @@ ENUM_TIMEFRAMES GetTimeframe(string tf)
 
    return -1;
   }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+template<typename T>
+T StringToEnum(string str,T enu)
+  {
+   for(int i=0; i<256; i++)
+      if(EnumToString(enu=(T)i)==str)
+         return(enu);
+//---
+   return(-1);
+  }
 //+------------------------------------------------------------------+

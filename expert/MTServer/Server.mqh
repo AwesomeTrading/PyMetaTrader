@@ -4,6 +4,7 @@
 
 #include <Zmq/Zmq.mqh>
 #include  "Markets.mqh"
+#include  "Account.mqh"
 #include  "Helper.mqh"
 
 #define PROJECT_NAME "MTSERVER"
@@ -23,7 +24,8 @@ private:
    Socket            *pushSocket;
    Socket            *pullSocket;
    Socket            *pubSocket;
-   MTMarkets           *markets;
+   MTMarkets         *markets;
+   MTAccount         *account;
 
    bool              startSockets();
    bool              stopSockets();
@@ -32,8 +34,14 @@ private:
    void              parseRequest(string& message, string& retArray[]);
    void              reply(Socket& socket, string message);
    void              processRequest(string &compArray[]);
+
+   void              processRequestTime(string &params[]);
    void              processRequestHistory(string &params[]);
-   void              processRequestSymbols(string &params[]);
+   void              processRequestMarkets(string &params[]);
+
+   void              processRequestFund(string &params[]);
+   void              processRequestOrders(string &params[]);
+   void              processRequestTrades(string &params[]);
 
 public:
                      MTServer();
@@ -54,6 +62,7 @@ void MTServer::MTServer(void)
    this.pubSocket = new Socket(this.context, ZMQ_PUB);
 
    this.markets = new MTMarkets();
+   this.account = new MTAccount();
   }
 //+------------------------------------------------------------------+
 //|                                                                  |
@@ -76,10 +85,10 @@ bool MTServer::stop(void)
    Print("Stop Server");
    this.stopSockets();
 
-   delete context;
+   /*delete context;
    delete pushSocket;
    delete pullSocket;
-   delete pubSocket;
+   delete pubSocket;*/
    return true;
   }
 //+------------------------------------------------------------------+
@@ -188,6 +197,15 @@ bool MTServer::status(void)
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
+void MTServer::reply(Socket& socket, string message)
+  {
+   Print("Reply: " + message);
+   ZmqMsg msg(message);
+   socket.send(msg,true); // NON-BLOCKING
+  }
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
 void MTServer::checkRequest()
   {
    if(!this.status())
@@ -220,24 +238,6 @@ void MTServer::checkRequest()
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-void MTServer::processRequest(string &params[])
-  {
-   string action = params[0];
-
-   if(action == "HISTORY")
-     {
-      this.processRequestHistory(params);
-      return;
-     }
-   if(action == "SYMBOLS")
-     {
-      this.processRequestSymbols(params);
-      return;
-     }
-  }
-//+------------------------------------------------------------------+
-//|                                                                  |
-//+------------------------------------------------------------------+
 void MTServer::parseRequest(string& message, string& result[])
   {
    Print("Parsing: " + message);
@@ -249,12 +249,53 @@ void MTServer::parseRequest(string& message, string& result[])
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-void MTServer::reply(Socket& socket, string message)
+void MTServer::processRequest(string &params[])
   {
-   Print("Reply: " + message);
-   ZmqMsg msg(message);
-   socket.send(msg,true); // NON-BLOCKING
+   string action = params[0];
+
+// markets
+   if(action == "TIME")
+     {
+      this.processRequestTime(params);
+      return;
+     }
+   if(action == "HISTORY")
+     {
+      this.processRequestHistory(params);
+      return;
+     }
+   if(action == "MARKETS")
+     {
+      this.processRequestMarkets(params);
+      return;
+     }
+// account
+   if(action == "FUND")
+     {
+      this.processRequestFund(params);
+      return;
+     }
+   if(action == "ORDERS")
+     {
+      this.processRequestOrders(params);
+      return;
+     }
+   if(action == "TRADES")
+     {
+      this.processRequestTrades(params);
+      return;
+     }
   }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+void MTServer::processRequestTime(string &params[])
+  {
+   string result = StringFormat("TIME|%s|%d", params[1], TimeCurrent());
+   this.reply(pushSocket, result);
+  }
+
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
@@ -273,11 +314,44 @@ void MTServer::processRequestHistory(string &params[])
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-void MTServer::processRequestSymbols(string &params[])
+void MTServer::processRequestMarkets(string &params[])
   {
-   string result = StringFormat("SYMBOLS|%s|", params[1]);
-   this.markets.getSymbols(result);
+   string result = StringFormat("MARKETS|%s|", params[1]);
+   this.markets.getMarkets(result);
    this.reply(pushSocket, result);
   }
 
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+void MTServer::processRequestFund(string &params[])
+  {
+   string result = StringFormat("FUND|%s|", params[1]);
+   this.account.getFund(result);
+   this.reply(pushSocket, result);
+  }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+void MTServer::processRequestOrders(string &params[])
+  {
+   string symbol = params[2];
+   int mode = OP_BUYLIMIT|OP_BUYSTOP|OP_SELLLIMIT|OP_SELLSTOP;
+   string result = StringFormat("ORDERS|%s|", params[1]);
+   this.account.getTrades(symbol, mode, result);
+   this.reply(pushSocket, result);
+  }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+void MTServer::processRequestTrades(string &params[])
+  {
+   string symbol = params[2];
+   int mode = OP_BUY|OP_SELL;
+   string result = StringFormat("TRADES|%s|", params[1]);
+   this.account.getTrades(symbol, mode, result);
+   this.reply(pushSocket, result);
+  }
 //+------------------------------------------------------------------+

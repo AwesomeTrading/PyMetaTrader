@@ -69,7 +69,7 @@ public:
    bool              history(string symbol, ENUM_TIMEFRAMES period, datetime startTime, datetime endTime, string &result);
    bool              subscribeBar(string symbol, ENUM_TIMEFRAMES period);
    bool              subscribeTicker(string symbol);
-   bool              getSymbols(string &result);
+   bool              getMarkets(string &result);
   };
 
 //+------------------------------------------------------------------+
@@ -81,13 +81,32 @@ void MTMarkets::MTMarkets()
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-bool MTMarkets::getSymbols(string &result)
+bool MTMarkets::getMarkets(string &result)
   {
    int total = SymbolsTotal(false);
+   if(total == 0)
+      return true;
+
    for(int i = 0; i< total; i++)
      {
       string symbol = SymbolName(i, false);
-      StringAdd(result, StringFormat("%s;", symbol));
+      // SYMBOL|SYMBOL_DESCRIPTION|SYMBOL_CURRENCY_BASE|MODE_LOW|MODE_HIGH|MODE_BID|MODE_ASK|MODE_POINT|MODE_DIGITS|MODE_SPREAD|MODE_TICKSIZE|MODE_MINLOT|MODE_LOTSTEP|MODE_MAXLOT
+      StringAdd(result, StringFormat("%s|%s|%s|%g|%g|%g|%g|%g|%g|%g|%g|%g|%g|%g;",
+                                     symbol,
+                                     SymbolInfoString(symbol, SYMBOL_DESCRIPTION),
+                                     SymbolInfoString(symbol, SYMBOL_CURRENCY_BASE),
+                                     MarketInfo(symbol, MODE_LOW),
+                                     MarketInfo(symbol, MODE_HIGH),
+                                     MarketInfo(symbol, MODE_BID),
+                                     MarketInfo(symbol, MODE_ASK),
+                                     MarketInfo(symbol, MODE_POINT),
+                                     MarketInfo(symbol, MODE_DIGITS),
+                                     MarketInfo(symbol, MODE_SPREAD),
+                                     MarketInfo(symbol, MODE_TICKSIZE),
+                                     MarketInfo(symbol, MODE_MINLOT),
+                                     MarketInfo(symbol, MODE_LOTSTEP),
+                                     MarketInfo(symbol, MODE_MAXLOT)
+                                    ));
      }
 
    result = StringSubstr(result, 0, StringLen(result)-1);
