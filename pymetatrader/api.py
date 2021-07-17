@@ -3,7 +3,7 @@ import queue
 import threading
 import random
 import string
-from datetime import datetime
+from datetime import datetime, timezone
 from time import sleep
 
 
@@ -176,16 +176,29 @@ class MetaTrader():
         # self.subscribers[key] = stream_id
 
     def get_bars(self, symbol, timeframe, start, end):
-        request = "{};{};{};{};{}".format(symbol, timeframe, start, end)
+        start = datetime.fromtimestamp(start / 1000)
+        start = start.strftime('%Y.%m.%d %H:%M:00')
+
+        end = datetime.fromtimestamp(end / 1000)
+        end = end.strftime('%Y.%m.%d %H:%M:00')
+
+        request = "{};{};{};{}".format(symbol, timeframe, start, end)
         data = self._request_and_wait(self.push_socket, 'HISTORY', request)
         return self._parse_bars(data)
 
     def _parse_bars(self, data):
+        data = data.split('|', 2)[2]
         raws = data.split(';')
         bars = []
         for raw in raws:
+            if not raw:
+                continue
+
             bar = raw.split('|')
-            bar[0] = datetime.strptime(bar[0], '%Y.%m.%d %H:%M:%S')
+            # bar time
+            bar_time = datetime.strptime(bar[0], '%Y.%m.%d %H:%M:%S')
+            bar[0] = bar_time.replace(tzinfo=timezone.utc).timestamp() / 1000
+            
             bars.append(bar)
         return bars
 
@@ -216,24 +229,15 @@ class MetaTrader():
 
     # quote
     def get_quotes(self, symbols=[]):
+        markets = self.get_markets()
         if not symbols:
-            symbols = []
-        symbols = ",".join(symbols)
+            return markets
 
-        print('---> get quotes: ', symbols)
-        data = self._request_and_wait(self.push_socket, 'QUOTES', symbols)
-        return self._parse_quotes(data)
-
-    def _parse_quotes(self, data):
-        raws = data.split(';')
-        quotes = []
-        for raw in raws:
-            quote = raw.split('|')
-            quotes.append(dict(
-                id=quote[0],
-                symbol=quote[0],
-            ))
-        return quotes
+        results = []
+        for market in markets:
+            if market['symbol'] in symbols:
+                results.append(market)
+        return results
 
     ### ACCOUNT
     # fund
