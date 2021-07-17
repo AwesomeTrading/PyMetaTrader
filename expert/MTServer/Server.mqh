@@ -30,11 +30,19 @@ private:
    bool              startSockets();
    bool              stopSockets();
    bool              status();
+   void              reply(Socket& socket, string message);
+
+   // subscribers
+   void              checkSubscribers();
+   void              processSubBars();
+
+   // request
    void              checkRequest();
    void              parseRequest(string& message, string& retArray[]);
-   void              reply(Socket& socket, string message);
    void              processRequest(string &compArray[]);
 
+   void              processRequestSubBars(string &params[]);
+   void              processRequestUnsubBars(string &params[]);
    void              processRequestTime(string &params[]);
    void              processRequestHistory(string &params[]);
    void              processRequestMarkets(string &params[]);
@@ -96,6 +104,7 @@ bool MTServer::stop(void)
 //+------------------------------------------------------------------+
 void MTServer::onTick(void)
   {
+   this.checkSubscribers();
   }
 //+------------------------------------------------------------------+
 //|                                                                  |
@@ -158,8 +167,6 @@ bool MTServer::startSockets(void)
 //+------------------------------------------------------------------+
 bool MTServer::stopSockets(void)
   {
-   Print("Stop socket");
-
    Print("[PUSH] Unbinding MT4 Server from Socket on Port " + IntegerToString(PULL_PORT) + "..");
    pushSocket.unbind(StringFormat("%s://%s:%d", ZEROMQ_PROTOCOL, HOSTNAME, PULL_PORT));
    pushSocket.disconnect(StringFormat("%s://%s:%d", ZEROMQ_PROTOCOL, HOSTNAME, PULL_PORT));
@@ -202,6 +209,24 @@ void MTServer::reply(Socket& socket, string message)
    Print("Reply: " + message);
    ZmqMsg msg(message);
    socket.send(msg,true); // NON-BLOCKING
+  }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+void MTServer::checkSubscribers()
+  {
+   this.processSubBars();
+  }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+void MTServer::processSubBars()
+  {
+   string result = "BARS|";
+   this.markets.getLastBars(result);
+   this.reply(pubSocket, result);
   }
 //+------------------------------------------------------------------+
 //|                                                                  |
@@ -254,14 +279,14 @@ void MTServer::processRequest(string &params[])
    string action = params[0];
 
 // markets
-   if(action == "TIME")
+   if(action == "SUB_BARS")
      {
-      this.processRequestTime(params);
+      this.processRequestSubBars(params);
       return;
      }
-   if(action == "HISTORY")
+   if(action == "UNSUB_BARS")
      {
-      this.processRequestHistory(params);
+      this.processRequestUnsubBars(params);
       return;
      }
    if(action == "MARKETS")
@@ -269,6 +294,17 @@ void MTServer::processRequest(string &params[])
       this.processRequestMarkets(params);
       return;
      }
+   if(action == "HISTORY")
+     {
+      this.processRequestHistory(params);
+      return;
+     }
+   if(action == "TIME")
+     {
+      this.processRequestTime(params);
+      return;
+     }
+
 // account
    if(action == "FUND")
      {
@@ -290,6 +326,31 @@ void MTServer::processRequest(string &params[])
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
+void MTServer::processRequestSubBars(string &params[])
+  {
+
+   string symbol = params[2];
+   ENUM_TIMEFRAMES period = GetTimeframe(params[3]);
+   this.markets.subscribeBar(symbol, period);
+
+   string result = StringFormat("SUB_BARS|%s|OK", params[1]);
+   this.reply(pushSocket, result);
+  }
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+void MTServer::processRequestUnsubBars(string &params[])
+  {
+   string symbol = params[2];
+   ENUM_TIMEFRAMES period = GetTimeframe(params[3]);
+   this.markets.unsubscribeBar(symbol, period);
+
+   string result = StringFormat("UNSUB_BARS|%s|OK", params[1]);
+   this.reply(pushSocket, result);
+  }
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
 void MTServer::processRequestTime(string &params[])
   {
    string result = StringFormat("TIME|%s|%d", params[1], TimeCurrent());
@@ -307,7 +368,7 @@ void MTServer::processRequestHistory(string &params[])
    datetime endTime = StringToTime(params[5]);
    string result = StringFormat("HISTORY|%s|%s|%s|", params[1], params[2], params[3]);
 
-   this.markets.history(symbol, period, startTime, endTime, result);
+   this.markets.getHistory(symbol, period, startTime, endTime, result);
    this.reply(pushSocket, result);
   }
 

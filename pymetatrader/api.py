@@ -151,29 +151,15 @@ class MetaTrader():
         )
 
     # bars
-    def unsubscribe_bars(self, symbol, exchange, timeframe):
-        pass
-        # key = f"bar-{symbol}:{exchange}:{timeframe}"
-        # if key in self.subscribers:
-        #     stream_id = self.subscribers[key]
-        #     self.store.unsubscribe(stream_id)
-        #     try:
-        #         del self.subscribers[key]
-        #     except:
-        #         pass
+    def unsubscribe_bars(self, symbol, timeframe):
+        request = "{};{}".format(symbol, timeframe)
+        data = self._request_and_wait(self.push_socket, 'UNSUB_BARS', request)
+        return data == "OK"
 
-    def subscribe_bars(self, symbol, exchange, timeframe):
-        pass
-        # key = f"bar-{symbol}:{exchange}:{timeframe}"
-        # if key in self.subscribers:
-        #     return
-
-        # exsymbol = self._parse_exchangesymbol(symbol)
-        # extimeframe = TIMEFRAME_T2B[timeframe]
-        # q, stream_id = self.store.subscribe_bars(markets=[exsymbol],
-        #                                          interval=extimeframe,
-        #                                          q=self.q_bar)
-        # self.subscribers[key] = stream_id
+    def subscribe_bars(self, symbol, timeframe):
+        request = "{};{}".format(symbol, timeframe)
+        data = self._request_and_wait(self.push_socket, 'SUB_BARS', request)
+        return data == "OK"
 
     def get_bars(self, symbol, timeframe, start, end):
         start = datetime.fromtimestamp(start / 1000)
@@ -197,8 +183,8 @@ class MetaTrader():
             bar = raw.split('|')
             # bar time
             bar_time = datetime.strptime(bar[0], '%Y.%m.%d %H:%M:%S')
-            bar[0] = bar_time.replace(tzinfo=timezone.utc).timestamp() / 1000
-            
+            bar[0] = bar_time.replace(tzinfo=timezone.utc).timestamp() * 1000
+
             bars.append(bar)
         return bars
 

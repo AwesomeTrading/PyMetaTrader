@@ -4,54 +4,45 @@
 //|                                       http://www.companyname.net |
 //+------------------------------------------------------------------+
 
+#include  "Helper.mqh"
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
 class Instrument
   {
-
 protected:
    string            symbol;
    ENUM_TIMEFRAMES   timeframe;
-   //datetime lastUpdate;
 
 public:
+   string            getSymbol()    { return symbol; }
+   ENUM_TIMEFRAMES   getTimeframe() { return timeframe; }
 
    void              Instrument()
      {
       symbol = "";
       timeframe = PERIOD_CURRENT;
-      // lastUpdate = 0;
      }
-
-
-   string            getSymbol()    { return symbol; }
-   ENUM_TIMEFRAMES   getTimeframe() { return timeframe; }
-   // datetime        getLastPublishTimestamp() { return lastUpdate; }
-   // void            setLastPublishTimestamp(datetime tmstmp) { _last_pub_rate = tmstmp; }
-
 
    void              setup(string arg_symbol, ENUM_TIMEFRAMES arg_timeframe)
      {
       symbol = arg_symbol;
       timeframe = arg_timeframe;
-      //_last_pub_rate = 0;
      }
 
-   //--------------------------------------------------------------
-   /** Get last N MqlRates from this instrument (symbol-timeframe)
-    *  @param rates Receives last 'count' rates
-    *  @param count Number of requested rates
-    *  @return Number of returned rates
-    */
+   bool              equal(string arg_symbol, ENUM_TIMEFRAMES arg_timeframe)
+     {
+      return this.symbol == arg_symbol && this.timeframe == arg_timeframe;
+     }
+
    int               GetRates(MqlRates& rates[], int count)
      {
-      // ensures that symbol is setup
       if(StringLen(symbol) == 0)
          return 0;
 
       return CopyRates(symbol, timeframe, 0, count, rates);
      }
+
   };
 
 
@@ -64,12 +55,20 @@ class MTMarkets
 private:
    string            symbols[];
    Instrument        instruments[];
+
+   void              parseRate(MqlRates& rate, string &result);
+
 public:
    void              MTMarkets();
-   bool              history(string symbol, ENUM_TIMEFRAMES period, datetime startTime, datetime endTime, string &result);
-   bool              subscribeBar(string symbol, ENUM_TIMEFRAMES period);
-   bool              subscribeTicker(string symbol);
    bool              getMarkets(string &result);
+   bool              getHistory(string symbol, ENUM_TIMEFRAMES period, datetime startTime, datetime endTime, string &result);
+
+   bool              subscribeBar(string symbol, ENUM_TIMEFRAMES period);
+   bool              unsubscribeBar(string symbol, ENUM_TIMEFRAMES period);
+   bool              getLastBars(string &result);
+
+   bool              subscribeTicker(string symbol);
+   bool              unsubscribeTicker(string symbol);
   };
 
 //+------------------------------------------------------------------+
@@ -115,7 +114,7 @@ bool MTMarkets::getMarkets(string &result)
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-bool MTMarkets::history(string symbol, ENUM_TIMEFRAMES period, datetime startTime, datetime endTime, string &result)
+bool MTMarkets::getHistory(string symbol, ENUM_TIMEFRAMES period, datetime startTime, datetime endTime, string &result)
   {
    MqlRates ratesArray[];
    int ratesCount = 0;
@@ -141,15 +140,7 @@ bool MTMarkets::history(string symbol, ENUM_TIMEFRAMES period, datetime startTim
 // add history to response string
    for(int i = 0; i < ratesCount; i++)
      {
-      StringAdd(result, StringFormat("%s|%g|%g|%g|%g|%d|%d|%d;",
-                                     TimeToString(ratesArray[i].time, TIME_DATE|TIME_MINUTES|TIME_SECONDS),
-                                     ratesArray[i].open,
-                                     ratesArray[i].high,
-                                     ratesArray[i].low,
-                                     ratesArray[i].close,
-                                     ratesArray[i].tick_volume,
-                                     ratesArray[i].spread,
-                                     ratesArray[i].real_volume));
+      this.parseRate(ratesArray[i], result);
      }
 
    result = StringSubstr(result, 0, StringLen(result)-1);
@@ -166,7 +157,58 @@ bool MTMarkets::subscribeBar(string symbol, ENUM_TIMEFRAMES period)
    this.instruments[size].setup(symbol, period);
    return true;
   }
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+bool MTMarkets::unsubscribeBar(string symbol, ENUM_TIMEFRAMES period)
+  {
+   int size = ArraySize(this.instruments);
+   bool shift = false;
+   for(int i = 0; i < size; i++)
+     {
+      Instrument instrument = this.instruments[i];
 
+      // replace instrument
+      if(shift)
+        {
+         this.instruments[i - 1] = instrument;
+         continue;
+        }
+
+      // find instrument
+      if(instrument.equal(symbol, period))
+        {
+         shift= true;
+         continue;
+        }
+     }
+
+   if(shift)
+     {
+      ArrayResize(this.instruments, size -1);
+     }
+   return true;
+  }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+bool MTMarkets::getLastBars(string &result)
+  {
+   MqlRates rates[1];
+   int size = ArraySize(this.instruments);
+
+   for(int i = 0; i < size; i++)
+     {
+      Instrument instrument = this.instruments[i];
+      instrument.GetRates(rates, 1);
+      StringAdd(result, StringFormat("%s|%s|",
+                                     instrument.getSymbol(),
+                                     GetTimeframeText(instrument.getTimeframe())));
+      this.parseRate(rates[0], result);
+     }
+   return true;
+  }
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
@@ -177,5 +219,27 @@ bool MTMarkets::subscribeTicker(string symbol)
    this.symbols[size] = symbol;
    return true;
   }
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+bool MTMarkets::unsubscribeTicker(string symbol)
+  {
+   return true;
+  }
 
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+void MTMarkets::parseRate(MqlRates& rate, string &result)
+  {
+   StringAdd(result, StringFormat("%s|%g|%g|%g|%g|%d|%d|%d;",
+                                  TimeToString(rate.time, TIME_DATE|TIME_MINUTES|TIME_SECONDS),
+                                  rate.open,
+                                  rate.high,
+                                  rate.low,
+                                  rate.close,
+                                  rate.real_volume,
+                                  rate.spread,
+                                  rate.tick_volume));
+  }
 //+------------------------------------------------------------------+

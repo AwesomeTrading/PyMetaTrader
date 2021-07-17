@@ -65,7 +65,28 @@ T StringToEnum(string str,T enu)
    for(int i=0; i<256; i++)
       if(EnumToString(enu=(T)i)==str)
          return(enu);
-//---
+
    return(-1);
+  }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+template <typename T>
+void ArrayRemove(T& A[], T value)
+  {
+   bool isShiftOn = false;
+   for(int i=0; i < ArraySize(A) - 1; i++)
+     {
+      if(A[i] == value)
+        {
+         isShiftOn = true;
+        }
+      if(isShiftOn == true)
+        {
+         A[i] = A[i + 1];
+        }
+     }
+   ArrayResize(A, ArraySize(A) - 1);
   }
 //+------------------------------------------------------------------+
