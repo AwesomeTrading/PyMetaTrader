@@ -65,6 +65,7 @@ public:
 
    bool              subscribeBar(string symbol, ENUM_TIMEFRAMES period);
    bool              unsubscribeBar(string symbol, ENUM_TIMEFRAMES period);
+   bool              hasBarSubscribers(void);
    bool              getLastBars(string &result);
 
    bool              subscribeTicker(string symbol);
@@ -193,6 +194,13 @@ bool MTMarkets::unsubscribeBar(string symbol, ENUM_TIMEFRAMES period)
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
+bool MTMarkets::hasBarSubscribers(void)
+  {
+   return ArraySize(this.instruments) > 0;
+  }
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
 bool MTMarkets::getLastBars(string &result)
   {
    MqlRates rates[1];
@@ -238,8 +246,8 @@ void MTMarkets::parseRate(MqlRates& rate, string &result)
                                   rate.high,
                                   rate.low,
                                   rate.close,
-                                  rate.real_volume,
+                                  rate.tick_volume,
                                   rate.spread,
-                                  rate.tick_volume));
+                                  rate.real_volume));
   }
 //+------------------------------------------------------------------+

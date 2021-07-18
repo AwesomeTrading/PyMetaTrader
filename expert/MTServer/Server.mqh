@@ -112,6 +112,7 @@ void MTServer::onTick(void)
 void MTServer::onTimer(void)
   {
    this.checkRequest();
+   this.checkSubscribers();
   }
 //+------------------------------------------------------------------+
 //|                                                                  |
@@ -224,6 +225,9 @@ void MTServer::checkSubscribers()
 //+------------------------------------------------------------------+
 void MTServer::processSubBars()
   {
+   if(!this.markets.hasBarSubscribers())
+      return;
+
    string result = "BARS|";
    this.markets.getLastBars(result);
    this.reply(pubSocket, result);

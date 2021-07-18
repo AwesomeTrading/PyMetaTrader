@@ -25,6 +25,7 @@ string GetTimeframeText(ENUM_TIMEFRAMES tf)
       case PERIOD_MN1:
          return "MN1";
       default:
+         PrintFormat("Timeframe %s parse faile", EnumToString(tf));
          return "UNKNOWN";
      }
   }
@@ -53,6 +54,7 @@ ENUM_TIMEFRAMES GetTimeframe(string tf)
    if(tf == "MN1")
       return  PERIOD_MN1;
 
+   PrintFormat("[ERROR] Cannot parse timeframe %s", tf);
    return -1;
   }
 
