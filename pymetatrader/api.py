@@ -17,12 +17,20 @@ class MetaTrader():
     wait_timeout = 5000
     waiters = dict()
 
-    def __init__(self, host, push_port=32768, pull_port=32769, sub_port=32770):
+    def __init__(
+        self,
+        host,
+        push_port=32768,
+        pull_port=32769,
+        sub_port=32770,
+        q=None,
+    ):
         self.host = host
         self.push_port = push_port
         self.pull_port = pull_port
         self.sub_port = sub_port
         self.url = "tcp://" + self.host + ":"
+        self.q_sub = q
 
         # ZeroMQ Context
         self.context = zmq.Context()
@@ -37,6 +45,8 @@ class MetaTrader():
         # self.pull_socket_status = {'state': True, 'latest_event': 'N/A'}
 
         self.sub_socket = self.context.socket(zmq.SUB)
+        self.sub_socket.setsockopt_string(zmq.SUBSCRIBE, "BARS")
+        self.sub_socket.setsockopt_string(zmq.SUBSCRIBE, "QUOTES")
 
         # Bind PUSH Socket to send commands to MetaTrader
         self.push_socket.connect(self.url + str(self.push_port))
@@ -49,9 +59,9 @@ class MetaTrader():
               str(self.pull_port))
 
         # Connect SUB Socket to receive market data from MetaTrader
+        self.sub_socket.connect(self.url + str(self.sub_port))
         print("[INIT] Listening for market data from METATRADER (SUB): " +
               str(self.sub_port))
-        self.sub_socket.connect(self.url + str(self.sub_port))
 
         # Initialize POLL set and register PULL and SUB sockets
         self.poller = zmq.Poller()
@@ -59,12 +69,15 @@ class MetaTrader():
         self.poller.register(self.sub_socket, zmq.POLLIN)
 
         self._t_wait()
+        self._t_ping()
 
     def stop(self):
         self.push_socket.close()
         self.pull_socket.close()
         self.sub_socket.close()
-        self.context.destroy()
+        self.poller.unregister(self.pull_socket)
+        self.poller.unregister(self.sub_socket)
+        self.context.destroy(0)
 
     def _send(self, socket, data):
         # if self._PUSH_SOCKET_STATUS['state'] == True:
@@ -86,38 +99,52 @@ class MetaTrader():
 
         return None
 
+    ### PING
+    def _t_ping(self):
+        t = threading.Thread(target=self._loop_ping, daemon=False)
+        t.start()
+
+    def _loop_ping(self, delay=20):
+        while True:
+            sleep(delay)
+            data = self._request_and_wait(self.push_socket, 'PING')
+            if data != "PONG":
+                raise RuntimeError("Ping response is invalid")
+            print("PONG...")
+
+    ### EVENTS
     def _t_wait(self):
         t = threading.Thread(target=self._loop_wait, daemon=False)
         t.start()
 
     def _loop_wait(self, timeout=1000):
+        # wait for data
         while True:
             sleep(0.1)
 
             sockets = dict(self.poller.poll(timeout))
             for socket in sockets:
+                msg = self._recv(socket)
+                if not msg:
+                    break
+
+                # print("msg ", msg)
+                # sub socket
+                if socket == self.sub_socket:
+                    type, data = msg.split(" ", 1)
+                    data = self._parse_subcribe_data(type, data)
+                    self.q_sub.put((type, data))
+                    continue
+
+                # pull socket
                 try:
-                    msg = self._recv(socket)
-
-                    if not msg:
-                        break
-
-                    datas = msg.split("|", 2)
-                    print("datas ", datas)
-                    id = datas[1]
-                    data = datas[2]
+                    type, id, data = msg.split("|", 2)
                     if id in self.waiters:
                         self.waiters[id].put(data)
                     else:
                         print("Abandoned message: ", msg)
                 except Exception as e:
                     print("Wait data error: ", e)
-                # except zmq.error.Again:
-                #     pass  # resource temporarily unavailable, nothing to print
-                # except ValueError:
-                #     pass  # No data returned, passing iteration.
-                # except UnboundLocalError:
-                #     pass  # _symbol may sometimes get referenced before being assigned.
 
     def _request(self, socket, action, msg=''):
         request_id = random_id()
@@ -137,6 +164,26 @@ class MetaTrader():
         finally:
             del self.waiters[id]
 
+    def _parse_subcribe_data(self, type, data):
+        if type == "BARS":
+            result = []
+            raws = data.split(";")
+            for raw in raws:
+                symbol, timeframe, bar = raw.split("|", 2)
+                bar = self._parse_bar(bar)
+                result.append((symbol, timeframe, bar))
+            return result
+
+        if type == "QUOTES":
+            result = []
+            raws = data.split(";")
+            for raw in raws:
+                quote = self._parse_market(raw)
+                result.append(quote)
+            return result
+
+        raise RuntimeError(f"Cannot parse subscribe data: {type} {data}")
+
     ### MARKETS
     # time
     def get_time(self):
@@ -151,14 +198,14 @@ class MetaTrader():
         )
 
     # bars
-    def unsubscribe_bars(self, symbol, timeframe):
-        request = "{};{}".format(symbol, timeframe)
-        data = self._request_and_wait(self.push_socket, 'UNSUB_BARS', request)
-        return data == "OK"
-
     def subscribe_bars(self, symbol, timeframe):
         request = "{};{}".format(symbol, timeframe)
         data = self._request_and_wait(self.push_socket, 'SUB_BARS', request)
+        return data == "OK"
+
+    def unsubscribe_bars(self, symbol, timeframe):
+        request = "{};{}".format(symbol, timeframe)
+        data = self._request_and_wait(self.push_socket, 'UNSUB_BARS', request)
         return data == "OK"
 
     def get_bars(self, symbol, timeframe, start, end):
@@ -180,18 +227,27 @@ class MetaTrader():
             if not raw:
                 continue
 
-            bar = raw.split('|')
-            # bar time
-            bar_time = datetime.strptime(bar[0], '%Y.%m.%d %H:%M:%S')
-            bar[0] = bar_time.replace(tzinfo=timezone.utc).timestamp() * 1000
-
+            bar = self._parse_bar(raw)
             bars.append(bar)
         return bars
+
+    def _parse_bar(self, raw):
+        bar = raw.split('|')
+        bar_time = datetime.strptime(bar[0], '%Y.%m.%d %H:%M:%S')
+        bar[0] = bar_time.replace(tzinfo=timezone.utc).timestamp() * 1000
+        return bar
 
     # symbols
     def get_markets(self):
         data = self._request_and_wait(self.push_socket, 'MARKETS')
         return self._parse_markets(data)
+
+    def _parse_markets(self, data):
+        raws = data.split(';')
+        markets = []
+        for raw in raws:
+            markets.append(self._parse_market(raw))
+        return markets
 
     # SYMBOL|SYMBOL_DESCRIPTION|SYMBOL_CURRENCY_BASE|MODE_LOW|MODE_HIGH|MODE_BID|MODE_ASK|MODE_POINT|MODE_DIGITS|MODE_SPREAD|MODE_TICKSIZE|MODE_MINLOT|MODE_LOTSTEP|MODE_MAXLOT
     _markets_keys = [['symbol', str], ['description', str], ['currency', str],
@@ -200,18 +256,17 @@ class MetaTrader():
                      ['spread', float], ['ticksize', float], ['minlot', float],
                      ['lotstep', float], ['maxlot', float]]
 
-    def _parse_markets(self, data):
-        raws = data.split(';')
-        markets = []
-        for raw in raws:
-            raw = raw.split('|')
+    def _parse_market(self, data):
+        try:
+            raw = data.split('|')
             market = dict()
             for i in range(0, len(self._markets_keys)):
                 key = self._markets_keys[i][0]
                 type = self._markets_keys[i][1]
                 market[key] = type(raw[i])
-            markets.append(market)
-        return markets
+            return market
+        except:
+            raise RuntimeError(f"Cannot parse market data: {data}")
 
     # quote
     def get_quotes(self, symbols=[]):
@@ -224,6 +279,14 @@ class MetaTrader():
             if market['symbol'] in symbols:
                 results.append(market)
         return results
+
+    def subscribe_quotes(self, symbol):
+        data = self._request_and_wait(self.push_socket, 'SUB_QUOTES', symbol)
+        return data == "OK"
+
+    def unsubscribe_quotes(self, symbol):
+        data = self._request_and_wait(self.push_socket, 'UNSUB_QUOTES', symbol)
+        return data == "OK"
 
     ### ACCOUNT
     # fund

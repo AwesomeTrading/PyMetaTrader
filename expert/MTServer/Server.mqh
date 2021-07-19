@@ -26,6 +26,7 @@ private:
    Socket            *pubSocket;
    MTMarkets         *markets;
    MTAccount         *account;
+   datetime          pingExpire;
 
    bool              startSockets();
    bool              stopSockets();
@@ -34,15 +35,22 @@ private:
 
    // subscribers
    void              checkSubscribers();
+   void              clearSubscribers();
    void              processSubBars();
+   void              processSubQuotes();
+
 
    // request
    void              checkRequest();
    void              parseRequest(string& message, string& retArray[]);
    void              processRequest(string &compArray[]);
+   void              processRequestPing(string &params[]);
 
    void              processRequestSubBars(string &params[]);
    void              processRequestUnsubBars(string &params[]);
+   void              processRequestSubQuotes(string &params[]);
+   void              processRequestUnsubQuotes(string &params[]);
+
    void              processRequestTime(string &params[]);
    void              processRequestHistory(string &params[]);
    void              processRequestMarkets(string &params[]);
@@ -71,6 +79,8 @@ void MTServer::MTServer(void)
 
    this.markets = new MTMarkets();
    this.account = new MTAccount();
+
+   this.pingExpire = TimeCurrent() + 30; // expire at next 30 seconds
   }
 //+------------------------------------------------------------------+
 //|                                                                  |
@@ -104,6 +114,13 @@ bool MTServer::stop(void)
 //+------------------------------------------------------------------+
 void MTServer::onTick(void)
   {
+   if(TimeCurrent() > this.pingExpire)
+     {
+      this.pingExpire = TimeCurrent() + 5 * 60; // expire at next 5 minutes
+      this.clearSubscribers();
+      return;
+     }
+
    this.checkSubscribers();
   }
 //+------------------------------------------------------------------+
@@ -112,7 +129,7 @@ void MTServer::onTick(void)
 void MTServer::onTimer(void)
   {
    this.checkRequest();
-   this.checkSubscribers();
+   this.onTick();
   }
 //+------------------------------------------------------------------+
 //|                                                                  |
@@ -191,15 +208,10 @@ bool MTServer::stopSockets(void)
 //+------------------------------------------------------------------+
 bool MTServer::status(void)
   {
-// Is _StopFlag == True, inform the client application
    if(IsStopped())
-     {
-      //InformPullClient(pullSocket, "{'_response': 'EA_IS_STOPPED'}");
-      return(false);
-     }
+      return false;
 
-// Default
-   return(true);
+   return true;
   }
 
 //+------------------------------------------------------------------+
@@ -209,7 +221,10 @@ void MTServer::reply(Socket& socket, string message)
   {
    Print("Reply: " + message);
    ZmqMsg msg(message);
-   socket.send(msg,true); // NON-BLOCKING
+   if(!socket.send(msg, true)) // NON-BLOCKING
+     {
+      Print("[ERROR] Cannot send data to socket");
+     }
   }
 
 //+------------------------------------------------------------------+
@@ -218,6 +233,17 @@ void MTServer::reply(Socket& socket, string message)
 void MTServer::checkSubscribers()
   {
    this.processSubBars();
+   this.processSubQuotes();
+  }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+void MTServer::clearSubscribers()
+  {
+   Print("Clear all subscribers");
+   this.markets.clearBarSubscribers();
+   this.markets.clearQuoteSubscribers();
   }
 
 //+------------------------------------------------------------------+
@@ -228,10 +254,24 @@ void MTServer::processSubBars()
    if(!this.markets.hasBarSubscribers())
       return;
 
-   string result = "BARS|";
+   string result = "BARS ";
    this.markets.getLastBars(result);
    this.reply(pubSocket, result);
   }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+void MTServer::processSubQuotes()
+  {
+   if(!this.markets.hasQuoteSubscribers())
+      return;
+
+   string result = "QUOTES ";
+   this.markets.getLastQuotes(result);
+   this.reply(pubSocket, result);
+  }
+
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
@@ -270,17 +310,23 @@ void MTServer::checkRequest()
 void MTServer::parseRequest(string& message, string& result[])
   {
    Print("Parsing: " + message);
-
-   string sep = ";";
-   ushort u_sep = StringGetCharacter(sep,0);
+   ushort u_sep = StringGetCharacter(";", 0);
    int splits = StringSplit(message, u_sep, result);
   }
+
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
 void MTServer::processRequest(string &params[])
   {
    string action = params[0];
+
+// ping
+   if(action == "PING")
+     {
+      this.processRequestPing(params);
+      return;
+     }
 
 // markets
    if(action == "SUB_BARS")
@@ -291,6 +337,16 @@ void MTServer::processRequest(string &params[])
    if(action == "UNSUB_BARS")
      {
       this.processRequestUnsubBars(params);
+      return;
+     }
+   if(action == "SUB_QUOTES")
+     {
+      this.processRequestSubQuotes(params);
+      return;
+     }
+   if(action == "UNSUB_QUOTES")
+     {
+      this.processRequestUnsubQuotes(params);
       return;
      }
    if(action == "MARKETS")
@@ -330,9 +386,19 @@ void MTServer::processRequest(string &params[])
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
+void MTServer::processRequestPing(string &params[])
+  {
+   this.pingExpire = TimeCurrent() + 30; // expire at next 30 seconds
+
+   string result = StringFormat("PING|%s|PONG", params[1]);
+   this.reply(pushSocket, result);
+  }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
 void MTServer::processRequestSubBars(string &params[])
   {
-
    string symbol = params[2];
    ENUM_TIMEFRAMES period = GetTimeframe(params[3]);
    this.markets.subscribeBar(symbol, period);
@@ -340,6 +406,7 @@ void MTServer::processRequestSubBars(string &params[])
    string result = StringFormat("SUB_BARS|%s|OK", params[1]);
    this.reply(pushSocket, result);
   }
+
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
@@ -352,6 +419,31 @@ void MTServer::processRequestUnsubBars(string &params[])
    string result = StringFormat("UNSUB_BARS|%s|OK", params[1]);
    this.reply(pushSocket, result);
   }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+void MTServer::processRequestSubQuotes(string &params[])
+  {
+   string symbol = params[2];
+   this.markets.subscribeQuote(symbol);
+
+   string result = StringFormat("SUB_QUOTES|%s|OK", params[1]);
+   this.reply(pushSocket, result);
+  }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+void MTServer::processRequestUnsubQuotes(string &params[])
+  {
+   string symbol = params[2];
+   this.markets.unsubscribeQuote(symbol);
+
+   string result = StringFormat("UNSUB_QUOTES|%s|OK", params[1]);
+   this.reply(pushSocket, result);
+  }
+
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+

@@ -57,6 +57,7 @@ private:
    Instrument        instruments[];
 
    void              parseRate(MqlRates& rate, string &result);
+   void              parseMarketInfo(string symbol, string &result);
 
 public:
    void              MTMarkets();
@@ -66,10 +67,14 @@ public:
    bool              subscribeBar(string symbol, ENUM_TIMEFRAMES period);
    bool              unsubscribeBar(string symbol, ENUM_TIMEFRAMES period);
    bool              hasBarSubscribers(void);
+   void              clearBarSubscribers(void);
    bool              getLastBars(string &result);
 
-   bool              subscribeTicker(string symbol);
-   bool              unsubscribeTicker(string symbol);
+   bool              subscribeQuote(string symbol);
+   bool              unsubscribeQuote(string symbol);
+   bool              hasQuoteSubscribers(void);
+   void              clearQuoteSubscribers(void);
+   bool              getLastQuotes(string &result);
   };
 
 //+------------------------------------------------------------------+
@@ -90,26 +95,13 @@ bool MTMarkets::getMarkets(string &result)
    for(int i = 0; i< total; i++)
      {
       string symbol = SymbolName(i, false);
-      // SYMBOL|SYMBOL_DESCRIPTION|SYMBOL_CURRENCY_BASE|MODE_LOW|MODE_HIGH|MODE_BID|MODE_ASK|MODE_POINT|MODE_DIGITS|MODE_SPREAD|MODE_TICKSIZE|MODE_MINLOT|MODE_LOTSTEP|MODE_MAXLOT
-      StringAdd(result, StringFormat("%s|%s|%s|%g|%g|%g|%g|%g|%g|%g|%g|%g|%g|%g;",
-                                     symbol,
-                                     SymbolInfoString(symbol, SYMBOL_DESCRIPTION),
-                                     SymbolInfoString(symbol, SYMBOL_CURRENCY_BASE),
-                                     MarketInfo(symbol, MODE_LOW),
-                                     MarketInfo(symbol, MODE_HIGH),
-                                     MarketInfo(symbol, MODE_BID),
-                                     MarketInfo(symbol, MODE_ASK),
-                                     MarketInfo(symbol, MODE_POINT),
-                                     MarketInfo(symbol, MODE_DIGITS),
-                                     MarketInfo(symbol, MODE_SPREAD),
-                                     MarketInfo(symbol, MODE_TICKSIZE),
-                                     MarketInfo(symbol, MODE_MINLOT),
-                                     MarketInfo(symbol, MODE_LOTSTEP),
-                                     MarketInfo(symbol, MODE_MAXLOT)
-                                    ));
+      this.parseMarketInfo(symbol, result);
      }
 
-   result = StringSubstr(result, 0, StringLen(result)-1);
+   if(total > 0)
+     {
+      result = StringSubstr(result, 0, StringLen(result)-1);
+     }
    return true;
   }
 //+------------------------------------------------------------------+
@@ -144,7 +136,10 @@ bool MTMarkets::getHistory(string symbol, ENUM_TIMEFRAMES period, datetime start
       this.parseRate(ratesArray[i], result);
      }
 
-   result = StringSubstr(result, 0, StringLen(result)-1);
+   if(ratesCount > 0)
+     {
+      result = StringSubstr(result, 0, StringLen(result)-1);
+     }
    return true;
   }
 
@@ -154,6 +149,12 @@ bool MTMarkets::getHistory(string symbol, ENUM_TIMEFRAMES period, datetime start
 bool MTMarkets::subscribeBar(string symbol, ENUM_TIMEFRAMES period)
   {
    int size = ArraySize(this.instruments);
+   for(int i = 0; i < size; i++)
+     {
+      if(this.instruments[i].equal(symbol, period))
+         return true;
+     }
+
    ArrayResize(this.instruments, size +1);
    this.instruments[size].setup(symbol, period);
    return true;
@@ -201,6 +202,13 @@ bool MTMarkets::hasBarSubscribers(void)
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
+void MTMarkets::clearBarSubscribers(void)
+  {
+   ArrayResize(this.instruments, 0);
+  }
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
 bool MTMarkets::getLastBars(string &result)
   {
    MqlRates rates[1];
@@ -215,23 +223,11 @@ bool MTMarkets::getLastBars(string &result)
                                      GetTimeframeText(instrument.getTimeframe())));
       this.parseRate(rates[0], result);
      }
-   return true;
-  }
-//+------------------------------------------------------------------+
-//|                                                                  |
-//+------------------------------------------------------------------+
-bool MTMarkets::subscribeTicker(string symbol)
-  {
-   int size = ArraySize(this.symbols);
-   ArrayResize(this.symbols, size +1);
-   this.symbols[size] = symbol;
-   return true;
-  }
-//+------------------------------------------------------------------+
-//|                                                                  |
-//+------------------------------------------------------------------+
-bool MTMarkets::unsubscribeTicker(string symbol)
-  {
+
+   if(size > 0)
+     {
+      result = StringSubstr(result, 0, StringLen(result)-1);
+     }
    return true;
   }
 
@@ -249,5 +245,88 @@ void MTMarkets::parseRate(MqlRates& rate, string &result)
                                   rate.tick_volume,
                                   rate.spread,
                                   rate.real_volume));
+  }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+bool MTMarkets::subscribeQuote(string symbol)
+  {
+   int size = ArraySize(this.symbols);
+   for(int i = 0; i < size; i++)
+     {
+      if(this.symbols[i] == symbol)
+         return true;
+     }
+
+   ArrayResize(this.symbols, size +1);
+   this.symbols[size] = symbol;
+   return true;
+  }
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+bool MTMarkets::unsubscribeQuote(string symbol)
+  {
+   ArrayRemove(this.symbols, symbol);
+   return true;
+  }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+bool MTMarkets::hasQuoteSubscribers(void)
+  {
+   return ArraySize(this.symbols) > 0;
+  }
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+void MTMarkets::clearQuoteSubscribers(void)
+  {
+   ArrayResize(this.symbols, 0);
+  }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+bool MTMarkets::getLastQuotes(string &result)
+  {
+   int size = ArraySize(this.symbols);
+   for(int i = 0; i < size; i++)
+     {
+      string symbol = this.symbols[i];
+      this.parseMarketInfo(symbol, result);
+     }
+
+   if(size > 0)
+     {
+      result = StringSubstr(result, 0, StringLen(result)-1);
+     }
+   return true;
+  }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+void MTMarkets::parseMarketInfo(string symbol, string &result)
+  {
+// SYMBOL|SYMBOL_DESCRIPTION|SYMBOL_CURRENCY_BASE|MODE_LOW|MODE_HIGH|MODE_BID|MODE_ASK|MODE_POINT|MODE_DIGITS|MODE_SPREAD|MODE_TICKSIZE|MODE_MINLOT|MODE_LOTSTEP|MODE_MAXLOT
+   StringAdd(result, StringFormat("%s|%s|%s|%g|%g|%g|%g|%g|%g|%g|%g|%g|%g|%g;",
+                                  symbol,
+                                  SymbolInfoString(symbol, SYMBOL_DESCRIPTION),
+                                  SymbolInfoString(symbol, SYMBOL_CURRENCY_BASE),
+                                  MarketInfo(symbol, MODE_LOW),
+                                  MarketInfo(symbol, MODE_HIGH),
+                                  MarketInfo(symbol, MODE_BID),
+                                  MarketInfo(symbol, MODE_ASK),
+                                  MarketInfo(symbol, MODE_POINT),
+                                  MarketInfo(symbol, MODE_DIGITS),
+                                  MarketInfo(symbol, MODE_SPREAD),
+                                  MarketInfo(symbol, MODE_TICKSIZE),
+                                  MarketInfo(symbol, MODE_MINLOT),
+                                  MarketInfo(symbol, MODE_LOTSTEP),
+                                  MarketInfo(symbol, MODE_MAXLOT)
+                                 ));
   }
 //+------------------------------------------------------------------+
