@@ -42,7 +42,6 @@ public:
 
       return CopyRates(symbol, timeframe, 0, count, rates);
      }
-
   };
 
 

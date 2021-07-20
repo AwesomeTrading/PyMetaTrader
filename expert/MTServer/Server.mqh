@@ -58,6 +58,9 @@ private:
    void              processRequestFund(string &params[]);
    void              processRequestOrders(string &params[]);
    void              processRequestTrades(string &params[]);
+   void              processRequestOpenOrder(string &params[]);
+   void              processRequestModifyOrder(string &params[]);
+   void              processRequestCloseOrder(string &params[]);
 
 public:
                      MTServer();
@@ -114,6 +117,7 @@ bool MTServer::stop(void)
 //+------------------------------------------------------------------+
 void MTServer::onTick(void)
   {
+   RefreshRates();
    if(TimeCurrent() > this.pingExpire)
      {
       this.pingExpire = TimeCurrent() + 5 * 60; // expire at next 5 minutes
@@ -371,14 +375,29 @@ void MTServer::processRequest(string &params[])
       this.processRequestFund(params);
       return;
      }
+   if(action == "TRADES")
+     {
+      this.processRequestTrades(params);
+      return;
+     }
    if(action == "ORDERS")
      {
       this.processRequestOrders(params);
       return;
      }
-   if(action == "TRADES")
+   if(action == "OPEN_ORDER")
      {
-      this.processRequestTrades(params);
+      this.processRequestOpenOrder(params);
+      return;
+     }
+   if(action == "MODIFY_ORDER")
+     {
+      this.processRequestModifyOrder(params);
+      return;
+     }
+   if(action == "CLOSE_ORDER")
+     {
+      this.processRequestCloseOrder(params);
       return;
      }
   }
@@ -491,6 +510,18 @@ void MTServer::processRequestFund(string &params[])
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
+void MTServer::processRequestTrades(string &params[])
+  {
+   string symbol = params[2];
+   int mode = OP_BUY|OP_SELL;
+   string result = StringFormat("TRADES|%s|", params[1]);
+   this.account.getTrades(symbol, mode, result);
+   this.reply(pushSocket, result);
+  }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
 void MTServer::processRequestOrders(string &params[])
   {
    string symbol = params[2];
@@ -503,12 +534,58 @@ void MTServer::processRequestOrders(string &params[])
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-void MTServer::processRequestTrades(string &params[])
+void MTServer::processRequestOpenOrder(string &params[])
   {
    string symbol = params[2];
-   int mode = OP_BUY|OP_SELL;
-   string result = StringFormat("TRADES|%s|", params[1]);
-   this.account.getTrades(symbol, mode, result);
+   int type = StringToOperationType(params[3]);
+   double lots = StringToDouble(params[4]);
+   double price = StringToDouble(params[5]);
+   double sl = StringToDouble(params[6]);
+   double tp = StringToDouble(params[7]);
+   string comment = params[8];
+
+   string result = StringFormat("OPEN_ORDER|%s|", params[1]);
+   int ticket = this.account.openOrder(symbol, type, lots, price, sl, tp, comment, result);
+   if(ticket >= 0)
+     {
+      StringAdd(result, IntegerToString(ticket));
+     }
+   this.reply(pushSocket, result);
+  }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+void MTServer::processRequestModifyOrder(string &params[])
+  {
+   int ticket = StrToInteger(params[2]);
+   double price = StringToDouble(params[3]);
+   double sl = StringToDouble(params[4]);
+   double tp = StringToDouble(params[5]);
+   datetime expiration = StringToTime(params[6]);
+
+   string result = StringFormat("MODIFY_ORDER|%s|", params[1]);
+   bool ok = this.account.modifyOrder(ticket, price, sl, tp, expiration, result);
+   if(ok)
+     {
+      StringAdd(result, "OK");
+     }
+   this.reply(pushSocket, result);
+  }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+void MTServer::processRequestCloseOrder(string &params[])
+  {
+   int ticket = StrToInteger(params[2]);
+
+   string result = StringFormat("CLOSE_ORDER|%s|", params[1]);
+   bool ok = this.account.closeOrder(ticket, result);
+   if(ok)
+     {
+      StringAdd(result, "OK");
+     }
    this.reply(pushSocket, result);
   }
 //+------------------------------------------------------------------+

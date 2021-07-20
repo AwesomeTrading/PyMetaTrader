@@ -233,8 +233,7 @@ class MetaTrader():
 
     def _parse_bar(self, raw):
         bar = raw.split('|')
-        bar_time = datetime.strptime(bar[0], '%Y.%m.%d %H:%M:%S')
-        bar[0] = bar_time.replace(tzinfo=timezone.utc).timestamp() * 1000
+        bar[0] = self._parse_datetime(bar[0])
         return bar
 
     # symbols
@@ -299,7 +298,7 @@ class MetaTrader():
         data = self._request_and_wait(self.push_socket, 'ORDERS')
         return self._parse_trades(data)
 
-    def get_trades(self, symbol, mode='OP_BUY|OP_SELL'):
+    def get_trades(self, symbol):
         data = self._request_and_wait(self.push_socket, 'TRADES', symbol)
         return self._parse_trades(data)
 
@@ -320,7 +319,7 @@ class MetaTrader():
                     type=trade[2],
                     price=float(trade[3]),
                     lots=float(trade[4]),
-                    time=trade[5],
+                    time=self._parse_datetime(trade[5]),
                     sl=float(trade[6]),
                     tp=float(trade[7]),
                     pnl=float(trade[8]),
@@ -329,3 +328,29 @@ class MetaTrader():
                     comment=trade[11],
                 ))
         return trades
+
+    # orders
+    def open_order(self, symbol, type, lots, price, sl=0, tp=0, comment=''):
+        request = f"{symbol};{type};{lots};{price};{price};{sl};{tp};{comment}"
+        ticket = self._request_and_wait(self.push_socket, 'OPEN_ORDER',
+                                        request)
+        return int(ticket)
+
+    def modify_order(self, ticket, price, sl=0, tp=0, expiration=0):
+        request = f"{ticket};{price};{price};{sl};{tp};{expiration}"
+        data = self._request_and_wait(self.push_socket, 'MODIFY_ORDER',
+                                      request)
+        if data != "OK":
+            raise RuntimeError(f"Modify order {ticket} error: {data}")
+        return True
+
+    def close_order(self, ticket):
+        data = self._request_and_wait(self.push_socket, 'CLOSE_ORDER', ticket)
+        if data != "OK":
+            raise RuntimeError(f"Modify order {ticket} error: {data}")
+        return True
+
+    ### helpers
+    def _parse_datetime(self, raw):
+        dt = datetime.strptime(raw, '%Y.%m.%d %H:%M:%S')
+        return dt.replace(tzinfo=timezone.utc).timestamp() * 1000

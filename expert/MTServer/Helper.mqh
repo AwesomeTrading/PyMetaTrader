@@ -1,9 +1,53 @@
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
+int StringToOperationType(string type)
+  {
+   if(type == "BUY_MARKET")
+      return OP_BUY;
+   if(type == "SELL_MARKET")
+      return OP_SELL;
+   if(type == "BUY_LIMIT")
+      return OP_BUYLIMIT;
+   if(type == "SELL_LIMIT")
+      return OP_SELLLIMIT;
+   if(type == "BUY_STOP")
+      return OP_BUYSTOP;
+   if(type == "SELL_STOP")
+      return OP_SELLSTOP;
+
+   PrintFormat("Cannot parse operation type %s", type);
+   return -1;
+  }
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+string OperationTypeToString(int type)
+  {
+   switch(type)
+     {
+      case OP_BUY:
+         return "BUY_MARKET";
+      case OP_SELL:
+         return "SELL_MARKET";
+      case OP_BUYLIMIT:
+         return "BUY_LIMIT";
+      case OP_SELLLIMIT:
+         return "SELL_LIMIT";
+      case OP_BUYSTOP:
+         return "BUY_STOP";
+      case OP_SELLSTOP:
+         return "SELL_STOP";
+      default:
+         PrintFormat("Operation type %s parse faile", type);
+         return "UNKNOWN";
+     }
+  }
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
 string GetTimeframeText(ENUM_TIMEFRAMES tf)
   {
-// Standard timeframes
    switch(tf)
      {
       case PERIOD_M1:

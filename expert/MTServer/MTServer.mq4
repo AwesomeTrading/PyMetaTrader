@@ -16,9 +16,9 @@ int OnInit()
    EventSetMillisecondTimer(1000);
 
    if(!server.start())
-      return(INIT_FAILED);
+      return INIT_FAILED;
 
-   return(INIT_SUCCEEDED);
+   return INIT_SUCCEEDED;
   }
 //+------------------------------------------------------------------+
 //| Expert deinitialization function                                 |
