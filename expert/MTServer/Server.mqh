@@ -32,6 +32,7 @@ private:
    bool              stopSockets();
    bool              status();
    void              reply(Socket& socket, string message);
+   void              replyOrderEvents(string events);
 
    // subscribers
    void              checkSubscribers();
@@ -133,7 +134,6 @@ void MTServer::onTick(void)
 void MTServer::onTimer(void)
   {
    this.checkRequest();
-   this.onTick();
   }
 //+------------------------------------------------------------------+
 //|                                                                  |
@@ -229,6 +229,14 @@ void MTServer::reply(Socket& socket, string message)
      {
       Print("[ERROR] Cannot send data to socket");
      }
+  }
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+void MTServer::replyOrderEvents(string events)
+  {
+   string result = StringFormat("ORDERS %s", events);
+   this.reply(pubSocket, result);
   }
 
 //+------------------------------------------------------------------+
@@ -513,9 +521,9 @@ void MTServer::processRequestFund(string &params[])
 void MTServer::processRequestTrades(string &params[])
   {
    string symbol = params[2];
-   int mode = OP_BUY|OP_SELL;
+   int modes[] = {OP_BUY, OP_SELL};
    string result = StringFormat("TRADES|%s|", params[1]);
-   this.account.getTrades(symbol, mode, result);
+   this.account.getOrders(symbol, modes, result);
    this.reply(pushSocket, result);
   }
 
@@ -525,9 +533,9 @@ void MTServer::processRequestTrades(string &params[])
 void MTServer::processRequestOrders(string &params[])
   {
    string symbol = params[2];
-   int mode = OP_BUYLIMIT|OP_BUYSTOP|OP_SELLLIMIT|OP_SELLSTOP;
+   int modes[] = {OP_BUYLIMIT, OP_BUYSTOP, OP_SELLLIMIT, OP_SELLSTOP};
    string result = StringFormat("ORDERS|%s|", params[1]);
-   this.account.getTrades(symbol, mode, result);
+   this.account.getOrders(symbol, modes, result);
    this.reply(pushSocket, result);
   }
 
@@ -551,6 +559,11 @@ void MTServer::processRequestOpenOrder(string &params[])
       StringAdd(result, IntegerToString(ticket));
      }
    this.reply(pushSocket, result);
+
+// put event OPEN ORDER
+   string event = "";
+   this.account.getOrderEventByTicket(ticket, EVENT_ORDER_OPENED, event);
+   this.replyOrderEvents(event);
   }
 
 //+------------------------------------------------------------------+
@@ -571,6 +584,11 @@ void MTServer::processRequestModifyOrder(string &params[])
       StringAdd(result, "OK");
      }
    this.reply(pushSocket, result);
+
+// put event MODIFY ORDER
+   string event = "";
+   this.account.getOrderEventByTicket(ticket, EVENT_ORDER_MODIFIED, event);
+   this.replyOrderEvents(event);
   }
 
 //+------------------------------------------------------------------+
@@ -587,5 +605,10 @@ void MTServer::processRequestCloseOrder(string &params[])
       StringAdd(result, "OK");
      }
    this.reply(pushSocket, result);
+
+// put event COMPLETED ORDER
+   string event = "";
+   this.account.getOrderEventByTicket(ticket, EVENT_ORDER_COMPLETED, event);
+   this.replyOrderEvents(event);
   }
 //+------------------------------------------------------------------+

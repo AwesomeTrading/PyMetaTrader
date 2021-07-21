@@ -110,7 +110,6 @@ class MetaTrader():
             data = self._request_and_wait(self.push_socket, 'PING')
             if data != "PONG":
                 raise RuntimeError("Ping response is invalid")
-            print("PONG...")
 
     ### EVENTS
     def _t_wait(self):
@@ -182,6 +181,16 @@ class MetaTrader():
                 result.append(quote)
             return result
 
+        if type == "ORDERS":
+            result = []
+            raws = data.split(";")
+            for raw in raws:
+                event, order = raw.split("|", 2)
+                order = self._parse_trade(order)
+                order['status'] = event
+                result.append(order)
+            return result
+
         raise RuntimeError(f"Cannot parse subscribe data: {type} {data}")
 
     ### MARKETS
@@ -234,6 +243,8 @@ class MetaTrader():
     def _parse_bar(self, raw):
         bar = raw.split('|')
         bar[0] = self._parse_datetime(bar[0])
+        for i in range(1, len(bar)):
+            bar[i] = float(bar[i])
         return bar
 
     # symbols
@@ -298,7 +309,7 @@ class MetaTrader():
         data = self._request_and_wait(self.push_socket, 'ORDERS')
         return self._parse_trades(data)
 
-    def get_trades(self, symbol):
+    def get_trades(self, symbol=''):
         data = self._request_and_wait(self.push_socket, 'TRADES', symbol)
         return self._parse_trades(data)
 
@@ -309,35 +320,37 @@ class MetaTrader():
             if not raw:
                 continue
 
-            trade = raw.split('|')
-
-            # TICKET|SYMBOL|TYPE|PRICE|LOT|TIME|SL|TP|PNL|COMMISSION|SWAP|COMMENT
-            trades.append(
-                dict(
-                    ticket=int(trade[0]),
-                    symbol=trade[1],
-                    type=trade[2],
-                    price=float(trade[3]),
-                    lots=float(trade[4]),
-                    time=self._parse_datetime(trade[5]),
-                    sl=float(trade[6]),
-                    tp=float(trade[7]),
-                    pnl=float(trade[8]),
-                    commission=float(trade[9]),
-                    swap=float(trade[10]),
-                    comment=trade[11],
-                ))
+            trade = self._parse_trade(raw)
+            trades.append(trade)
         return trades
+
+    def _parse_trade(self, raw):
+        trade = raw.split('|')
+        # TICKET|SYMBOL|TYPE|PRICE|LOT|TIME|SL|TP|PNL|COMMISSION|SWAP|COMMENT
+        return dict(
+            ticket=int(trade[0]),
+            symbol=trade[1],
+            type=trade[2],
+            price=float(trade[3]),
+            lots=float(trade[4]),
+            time=self._parse_datetime(trade[5]),
+            sl=float(trade[6]),
+            tp=float(trade[7]),
+            pnl=float(trade[8]),
+            commission=float(trade[9]),
+            swap=float(trade[10]),
+            comment=trade[11],
+        )
 
     # orders
     def open_order(self, symbol, type, lots, price, sl=0, tp=0, comment=''):
-        request = f"{symbol};{type};{lots};{price};{price};{sl};{tp};{comment}"
+        request = f"{symbol};{type};{lots};{price};{sl};{tp};{comment}"
         ticket = self._request_and_wait(self.push_socket, 'OPEN_ORDER',
                                         request)
         return int(ticket)
 
     def modify_order(self, ticket, price, sl=0, tp=0, expiration=0):
-        request = f"{ticket};{price};{price};{sl};{tp};{expiration}"
+        request = f"{ticket};{price};{sl};{tp};{expiration}"
         data = self._request_and_wait(self.push_socket, 'MODIFY_ORDER',
                                       request)
         if data != "OK":

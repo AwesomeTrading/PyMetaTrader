@@ -235,7 +235,7 @@ bool MTMarkets::getLastBars(string &result)
 //+------------------------------------------------------------------+
 void MTMarkets::parseRate(MqlRates& rate, string &result)
   {
-   StringAdd(result, StringFormat("%s|%g|%g|%g|%g|%d|%d|%d;",
+   StringAdd(result, StringFormat("%s|%g|%g|%g|%g|%g|%g|%g;",
                                   TimeToString(rate.time, TIME_DATE|TIME_MINUTES|TIME_SECONDS),
                                   rate.open,
                                   rate.high,

@@ -118,7 +118,7 @@ T StringToEnum(string str,T enu)
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-template <typename T>
+template<typename T>
 void ArrayRemove(T& A[], T value)
   {
    bool isShiftOn = false;
@@ -134,5 +134,18 @@ void ArrayRemove(T& A[], T value)
         }
      }
    ArrayResize(A, ArraySize(A) - 1);
+  }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+template<typename T>
+T ArrayExist(T& list[],T element)
+  {
+   for(int i=ArraySize(list) - 1; i>= 0; i--)
+      if(list[i]==element)
+         return true;
+
+   return false;
   }
 //+------------------------------------------------------------------+

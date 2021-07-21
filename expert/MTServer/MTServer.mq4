@@ -13,7 +13,7 @@ MTServer server;
 //+------------------------------------------------------------------+
 int OnInit()
   {
-   EventSetMillisecondTimer(1000);
+   EventSetMillisecondTimer(10);
 
    if(!server.start())
       return INIT_FAILED;
