@@ -533,7 +533,7 @@ void MTServer::processRequestTrades(string &params[])
 void MTServer::processRequestOrders(string &params[])
   {
    string symbol = params[2];
-   int modes[] = {OP_BUYLIMIT, OP_BUYSTOP, OP_SELLLIMIT, OP_SELLSTOP};
+   int modes[] = {};
    string result = StringFormat("ORDERS|%s|", params[1]);
    this.account.getOrders(symbol, modes, result);
    this.reply(pushSocket, result);

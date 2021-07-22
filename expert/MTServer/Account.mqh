@@ -97,7 +97,7 @@ bool MTAccount::getOrders(string symbol, int &modes[], string &result)
          continue;
       if(StringLen(symbol) > 0 && OrderSymbol() != symbol)
          continue;
-      if(!ArrayExist(modes, OrderType()))
+      if(ArraySize(modes) > 0 && !ArrayExist(modes, OrderType()))
          continue;
 
       this.parseOrder(result);
@@ -127,20 +127,22 @@ bool MTAccount::getOrderByTicket(int ticket, string &result)
 //+------------------------------------------------------------------+
 bool MTAccount::parseOrder(string &result)
   {
-// TICKET|SYMBOL|TYPE|PRICE|LOT|TIME|SL|TP|PNL|COMMISSION|SWAP|COMMENT
-   return StringAdd(result, StringFormat("%d|%s|%s|%g|%g|%s|%g|%g|%g|%g|%g|%s;",
+// TICKET|SYMBOL|TYPE|OPEN_PRICE|LOT|OPEN_TIME|SL|TP|PNL|COMMISSION|SWAP|COMMENT|CLOSE_PRICE|CLOSE_TIME
+   return StringAdd(result, StringFormat("%d|%s|%s|%g|%s|%g|%g|%g|%g|%g|%g|%s|%g|%s;",
                                          OrderTicket(),
                                          OrderSymbol(),
                                          OperationTypeToString(OrderType()),
                                          OrderOpenPrice(),
-                                         OrderLots(),
                                          TimeToString(OrderOpenTime(), TIME_DATE|TIME_MINUTES|TIME_SECONDS),
+                                         OrderLots(),
                                          OrderStopLoss(),
                                          OrderTakeProfit(),
                                          OrderProfit(),
                                          OrderCommission(),
                                          OrderSwap(),
-                                         OrderComment()
+                                         OrderComment(),
+                                         OrderClosePrice(),
+                                         TimeToString(OrderCloseTime(), TIME_DATE|TIME_MINUTES|TIME_SECONDS)
                                         ));
 
   }

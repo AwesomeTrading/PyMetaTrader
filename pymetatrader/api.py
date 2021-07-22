@@ -260,23 +260,14 @@ class MetaTrader():
         return markets
 
     # SYMBOL|SYMBOL_DESCRIPTION|SYMBOL_CURRENCY_BASE|MODE_LOW|MODE_HIGH|MODE_BID|MODE_ASK|MODE_POINT|MODE_DIGITS|MODE_SPREAD|MODE_TICKSIZE|MODE_MINLOT|MODE_LOTSTEP|MODE_MAXLOT
-    _markets_keys = [['symbol', str], ['description', str], ['currency', str],
-                     ['low', float], ['high', float], ['bid', float],
-                     ['ask', float], ['point', float], ['digits', float],
-                     ['spread', float], ['ticksize', float], ['minlot', float],
-                     ['lotstep', float], ['maxlot', float]]
+    _market_keys = [['symbol', str], ['description', str], ['currency', str],
+                    ['low', float], ['high', float], ['bid', float],
+                    ['ask', float], ['point', float], ['digits', float],
+                    ['spread', float], ['ticksize', float], ['minlot', float],
+                    ['lotstep', float], ['maxlot', float]]
 
     def _parse_market(self, data):
-        try:
-            raw = data.split('|')
-            market = dict()
-            for i in range(0, len(self._markets_keys)):
-                key = self._markets_keys[i][0]
-                type = self._markets_keys[i][1]
-                market[key] = type(raw[i])
-            return market
-        except:
-            raise RuntimeError(f"Cannot parse market data: {data}")
+        return self._parse_data_by_keys(data, self._market_keys)
 
     # quote
     def get_quotes(self, symbols=[]):
@@ -324,23 +315,16 @@ class MetaTrader():
             trades.append(trade)
         return trades
 
+    # TICKET|SYMBOL|TYPE|OPEN_PRICE|OPEN_TIME|LOT|SL|TP|PNL|COMMISSION|SWAP|COMMENT|CLOSE_PRICE|CLOSE_TIME
+    _order_keys = [['ticket', int], ['symbol', str], ['type', str],
+                   ['open_price', float], ['open_time', datetime],
+                   ['lots', float], ['sl', float], ['tp', float],
+                   ['pnl', float], ['commission', float], ['swap', float],
+                   ['comment', str], ['close_price', float],
+                   ['close_time', datetime]]
+
     def _parse_trade(self, raw):
-        trade = raw.split('|')
-        # TICKET|SYMBOL|TYPE|PRICE|LOT|TIME|SL|TP|PNL|COMMISSION|SWAP|COMMENT
-        return dict(
-            ticket=int(trade[0]),
-            symbol=trade[1],
-            type=trade[2],
-            price=float(trade[3]),
-            lots=float(trade[4]),
-            time=self._parse_datetime(trade[5]),
-            sl=float(trade[6]),
-            tp=float(trade[7]),
-            pnl=float(trade[8]),
-            commission=float(trade[9]),
-            swap=float(trade[10]),
-            comment=trade[11],
-        )
+        return self._parse_data_by_keys(raw, self._order_keys)
 
     # orders
     def open_order(self, symbol, type, lots, price, sl=0, tp=0, comment=''):
@@ -367,3 +351,17 @@ class MetaTrader():
     def _parse_datetime(self, raw):
         dt = datetime.strptime(raw, '%Y.%m.%d %H:%M:%S')
         return dt.replace(tzinfo=timezone.utc).timestamp() * 1000
+
+    def _parse_data_by_keys(self, data, keys):
+        try:
+            raw = data.split('|')
+            result = dict()
+            for i in range(0, len(keys)):
+                key = keys[i][0]
+                type = keys[i][1]
+                if type == datetime:
+                    type = self._parse_datetime
+                result[key] = type(raw[i])
+            return result
+        except:
+            raise RuntimeError(f"Cannot parse data {data} by keys {keys}")
