@@ -197,7 +197,7 @@ class MetaTrader():
     # time
     def get_time(self):
         data = self._request_and_wait(self.push_socket, 'TIME')
-        return int(data)
+        return float(data)
 
     def _parse_fund(self, data):
         raw = data.split('|')
@@ -218,12 +218,6 @@ class MetaTrader():
         return data == "OK"
 
     def get_bars(self, symbol, timeframe, start, end):
-        start = datetime.fromtimestamp(start / 1000)
-        start = start.strftime('%Y.%m.%d %H:%M:00')
-
-        end = datetime.fromtimestamp(end / 1000)
-        end = end.strftime('%Y.%m.%d %H:%M:00')
-
         request = "{};{};{};{}".format(symbol, timeframe, start, end)
         data = self._request_and_wait(self.push_socket, 'HISTORY', request)
         return self._parse_bars(data)
@@ -242,7 +236,7 @@ class MetaTrader():
 
     def _parse_bar(self, raw):
         bar = raw.split('|')
-        bar[0] = self._parse_datetime(bar[0])
+        bar[0] = float(bar[0]) * 1000
         for i in range(1, len(bar)):
             bar[i] = float(bar[i])
         return bar
@@ -315,16 +309,20 @@ class MetaTrader():
             trades.append(trade)
         return trades
 
-    # TICKET|SYMBOL|TYPE|OPEN_PRICE|OPEN_TIME|LOT|SL|TP|PNL|COMMISSION|SWAP|COMMENT|CLOSE_PRICE|CLOSE_TIME
+    # TICKET|SYMBOL|TYPE|OPEN_PRICE|OPEN_TIME|LOT|SL|TP|PNL|COMMISSION|SWAP|EXPIRATION|COMMENT|CLOSE_PRICE|CLOSE_TIME
     _order_keys = [['ticket', int], ['symbol', str], ['type', str],
-                   ['open_price', float], ['open_time', datetime],
-                   ['lots', float], ['sl', float], ['tp', float],
-                   ['pnl', float], ['commission', float], ['swap', float],
-                   ['comment', str], ['close_price', float],
-                   ['close_time', datetime]]
+                   ['open_price', float],
+                   ['open_time', float], ['lots', float], ['sl', float],
+                   ['tp', float], ['pnl', float], ['commission', float],
+                   ['swap', float], ['expiration', float], ['comment', str],
+                   ['close_price', float], ['close_time', float]]
 
     def _parse_trade(self, raw):
-        return self._parse_data_by_keys(raw, self._order_keys)
+        order = self._parse_data_by_keys(raw, self._order_keys)
+        order['open_price'] = order['open_price'] * 1000
+        order['close_time'] = order['close_time'] * 1000
+        order['expiration'] = order['expiration'] * 1000
+        return order
 
     # orders
     def open_order(self, symbol, type, lots, price, sl=0, tp=0, comment=''):
@@ -338,7 +336,7 @@ class MetaTrader():
         data = self._request_and_wait(self.push_socket, 'MODIFY_ORDER',
                                       request)
         if data != "OK":
-            raise RuntimeError(f"Modify order {ticket} error: {data}")
+            raise RuntimeError(f"Modify order {request} error: {data}")
         return True
 
     def close_order(self, ticket):
@@ -348,10 +346,6 @@ class MetaTrader():
         return True
 
     ### helpers
-    def _parse_datetime(self, raw):
-        dt = datetime.strptime(raw, '%Y.%m.%d %H:%M:%S')
-        return dt.replace(tzinfo=timezone.utc).timestamp() * 1000
-
     def _parse_data_by_keys(self, data, keys):
         try:
             raw = data.split('|')
@@ -359,8 +353,6 @@ class MetaTrader():
             for i in range(0, len(keys)):
                 key = keys[i][0]
                 type = keys[i][1]
-                if type == datetime:
-                    type = self._parse_datetime
                 result[key] = type(raw[i])
             return result
         except:

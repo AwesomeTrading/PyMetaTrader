@@ -321,7 +321,7 @@ void MTServer::checkRequest()
 //+------------------------------------------------------------------+
 void MTServer::parseRequest(string& message, string& result[])
   {
-   Print("Parsing: " + message);
+   Print("Request: " + message);
    ushort u_sep = StringGetCharacter(";", 0);
    int splits = StringSplit(message, u_sep, result);
   }
@@ -476,7 +476,7 @@ void MTServer::processRequestUnsubQuotes(string &params[])
 //+------------------------------------------------------------------+
 void MTServer::processRequestTime(string &params[])
   {
-   string result = StringFormat("TIME|%s|%d", params[1], TimeCurrent());
+   string result = StringFormat("TIME|%s|%f", params[1], TimeCurrent());
    this.reply(pushSocket, result);
   }
 
@@ -487,8 +487,9 @@ void MTServer::processRequestHistory(string &params[])
   {
    string symbol = params[2];
    ENUM_TIMEFRAMES period = GetTimeframe(params[3]);
-   datetime startTime = StringToTime(params[4]);
-   datetime endTime = StringToTime(params[5]);
+   datetime startTime = TimestampToTime(params[4]);
+   datetime endTime = TimestampToTime(params[5]);
+
    string result = StringFormat("HISTORY|%s|%s|%s|", params[1], params[2], params[3]);
 
    this.markets.getHistory(symbol, period, startTime, endTime, result);
@@ -575,14 +576,18 @@ void MTServer::processRequestModifyOrder(string &params[])
    double price = StringToDouble(params[3]);
    double sl = StringToDouble(params[4]);
    double tp = StringToDouble(params[5]);
-   datetime expiration = StringToTime(params[6]);
+// parse expiration
+   double expirationTimestamp = StringToDouble(params[6]);
+   datetime expiration = 0;
+   if(expirationTimestamp > 0)
+      expiration = TimestampToTime(expirationTimestamp);
 
    string result = StringFormat("MODIFY_ORDER|%s|", params[1]);
    bool ok = this.account.modifyOrder(ticket, price, sl, tp, expiration, result);
    if(ok)
-     {
       StringAdd(result, "OK");
-     }
+   else
+      StringAdd(result, GetLastErrorMessage());
    this.reply(pushSocket, result);
 
 // put event MODIFY ORDER
@@ -601,9 +606,10 @@ void MTServer::processRequestCloseOrder(string &params[])
    string result = StringFormat("CLOSE_ORDER|%s|", params[1]);
    bool ok = this.account.closeOrder(ticket, result);
    if(ok)
-     {
       StringAdd(result, "OK");
-     }
+   else
+      StringAdd(result, GetLastErrorMessage());
+
    this.reply(pushSocket, result);
 
 // put event COMPLETED ORDER
