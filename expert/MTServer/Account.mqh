@@ -56,6 +56,7 @@ public:
    bool              modifyOrder(int ticket, double price, double sl, double tp, datetime expiration, string &result);
    bool              closePartialOrder(int ticket, double lots, double price, string &result);
    bool              closeOrder(int ticket, string &result);
+   bool              cancelOrder(int ticket, string &result);
 
    int               getNewOrdersEvents(string &result);
    bool              getOrderEventByTicket(int ticket, ENUM_ORDER_EVENTS event, string &result);
@@ -128,7 +129,7 @@ bool MTAccount::getOrderByTicket(int ticket, string &result)
 bool MTAccount::parseOrder(string &result)
   {
 // TICKET|SYMBOL|TYPE|OPEN_PRICE|OPEN_TIME|LOT|SL|TP|PNL|COMMISSION|SWAP|EXPIRATION|COMMENT|CLOSE_PRICE|CLOSE_TIME
-   return StringAdd(result, StringFormat("%d|%s|%s|%g|%f|%g|%g|%g|%g|%g|%f|%s|%g|%f;",
+   return StringAdd(result, StringFormat("%d|%s|%s|%g|%f|%g|%g|%g|%g|%g|%g|%f|%s|%g|%f;",
                                          OrderTicket(),
                                          OrderSymbol(),
                                          OperationTypeToString(OrderType()),
@@ -217,7 +218,7 @@ bool MTAccount::modifyOrder(int ticket, double price, double sl, double tp, date
    sl = NormalizeDouble(sl, Digits());
    tp = NormalizeDouble(tp, Digits());
 
-   return OrderModify(ticket, price, sl, tp, expiration, CLR_NONE);
+   return OrderModify(ticket, price, sl, tp, expiration);
   }
 
 //+------------------------------------------------------------------+
@@ -225,15 +226,27 @@ bool MTAccount::modifyOrder(int ticket, double price, double sl, double tp, date
 //+------------------------------------------------------------------+
 bool MTAccount::closePartialOrder(int ticket, double lots, double price, string &result)
   {
-   RefreshRates();
    price = NormalizeDouble(price, Digits());
    return OrderClose(ticket, lots, price, this.slippage);
   }
+
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
 bool MTAccount::closeOrder(int ticket, string &result)
   {
-   return this.closePartialOrder(ticket, 0, 0, result);
+   if(!OrderSelect(ticket, SELECT_BY_TICKET))
+      return false;
+
+   RefreshRates();
+   return this.closePartialOrder(ticket, OrderLots(), OrderClosePrice(), result);
+  }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+bool MTAccount::cancelOrder(int ticket, string &result)
+  {
+   return OrderDelete(ticket);
   }
 //+------------------------------------------------------------------+

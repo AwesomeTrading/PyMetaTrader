@@ -62,6 +62,7 @@ private:
    void              processRequestOpenOrder(string &params[]);
    void              processRequestModifyOrder(string &params[]);
    void              processRequestCloseOrder(string &params[]);
+   void              processRequestCancelOrder(string &params[]);
 
 public:
                      MTServer();
@@ -408,6 +409,11 @@ void MTServer::processRequest(string &params[])
       this.processRequestCloseOrder(params);
       return;
      }
+   if(action == "CANCEL_ORDER")
+     {
+      this.processRequestCancelOrder(params);
+      return;
+     }
   }
 
 //+------------------------------------------------------------------+
@@ -576,18 +582,20 @@ void MTServer::processRequestModifyOrder(string &params[])
    double price = StringToDouble(params[3]);
    double sl = StringToDouble(params[4]);
    double tp = StringToDouble(params[5]);
-// parse expiration
-   double expirationTimestamp = StringToDouble(params[6]);
+// parse expire time
+   double expireTimestamp = StringToDouble(params[6]);
    datetime expiration = 0;
-   if(expirationTimestamp > 0)
-      expiration = TimestampToTime(expirationTimestamp);
+   if(expireTimestamp > 0)
+      expiration = TimestampToTime(expireTimestamp);
 
+// process
    string result = StringFormat("MODIFY_ORDER|%s|", params[1]);
    bool ok = this.account.modifyOrder(ticket, price, sl, tp, expiration, result);
    if(ok)
       StringAdd(result, "OK");
    else
       StringAdd(result, GetLastErrorMessage());
+
    this.reply(pushSocket, result);
 
 // put event MODIFY ORDER
@@ -615,6 +623,28 @@ void MTServer::processRequestCloseOrder(string &params[])
 // put event COMPLETED ORDER
    string event = "";
    this.account.getOrderEventByTicket(ticket, EVENT_ORDER_COMPLETED, event);
+   this.replyOrderEvents(event);
+  }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+void MTServer::processRequestCancelOrder(string &params[])
+  {
+   int ticket = StrToInteger(params[2]);
+
+   string result = StringFormat("CANCEL_ORDER|%s|", params[1]);
+   bool ok = this.account.cancelOrder(ticket, result);
+   if(ok)
+      StringAdd(result, "OK");
+   else
+      StringAdd(result, GetLastErrorMessage());
+
+   this.reply(pushSocket, result);
+
+// put event CANCEL ORDER
+   string event = "";
+   this.account.getOrderEventByTicket(ticket, EVENT_ORDER_CANCELED, event);
    this.replyOrderEvents(event);
   }
 //+------------------------------------------------------------------+

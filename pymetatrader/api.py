@@ -47,6 +47,7 @@ class MetaTrader():
         self.sub_socket = self.context.socket(zmq.SUB)
         self.sub_socket.setsockopt_string(zmq.SUBSCRIBE, "BARS")
         self.sub_socket.setsockopt_string(zmq.SUBSCRIBE, "QUOTES")
+        self.sub_socket.setsockopt_string(zmq.SUBSCRIBE, "ORDERS")
 
         # Bind PUSH Socket to send commands to MetaTrader
         self.push_socket.connect(self.url + str(self.push_port))
@@ -185,8 +186,9 @@ class MetaTrader():
             result = []
             raws = data.split(";")
             for raw in raws:
-                event, order = raw.split("|", 2)
-                order = self._parse_trade(order)
+                print(raw)
+                event, order = raw.split("|", 1)
+                order = self._parse_order(order)
                 order['status'] = event
                 result.append(order)
             return result
@@ -290,24 +292,25 @@ class MetaTrader():
         return self._parse_fund(data)
 
     # trades
-    def get_open_orders(self):
-        data = self._request_and_wait(self.push_socket, 'ORDERS')
-        return self._parse_trades(data)
-
     def get_trades(self, symbol=''):
         data = self._request_and_wait(self.push_socket, 'TRADES', symbol)
-        return self._parse_trades(data)
+        return self._parse_orders(data)
 
-    def _parse_trades(self, data):
+    # orders
+    def get_open_orders(self):
+        data = self._request_and_wait(self.push_socket, 'ORDERS')
+        return self._parse_orders(data)
+
+    def _parse_orders(self, data):
         raws = data.split(';')
-        trades = []
+        orders = []
         for raw in raws:
             if not raw:
                 continue
 
-            trade = self._parse_trade(raw)
-            trades.append(trade)
-        return trades
+            order = self._parse_order(raw)
+            orders.append(order)
+        return orders
 
     # TICKET|SYMBOL|TYPE|OPEN_PRICE|OPEN_TIME|LOT|SL|TP|PNL|COMMISSION|SWAP|EXPIRATION|COMMENT|CLOSE_PRICE|CLOSE_TIME
     _order_keys = [['ticket', int], ['symbol', str], ['type', str],
@@ -317,14 +320,13 @@ class MetaTrader():
                    ['swap', float], ['expiration', float], ['comment', str],
                    ['close_price', float], ['close_time', float]]
 
-    def _parse_trade(self, raw):
+    def _parse_order(self, raw):
         order = self._parse_data_by_keys(raw, self._order_keys)
-        order['open_price'] = order['open_price'] * 1000
+        order['open_time'] = order['open_time'] * 1000
         order['close_time'] = order['close_time'] * 1000
         order['expiration'] = order['expiration'] * 1000
         return order
 
-    # orders
     def open_order(self, symbol, type, lots, price, sl=0, tp=0, comment=''):
         request = f"{symbol};{type};{lots};{price};{sl};{tp};{comment}"
         ticket = self._request_and_wait(self.push_socket, 'OPEN_ORDER',
@@ -342,7 +344,13 @@ class MetaTrader():
     def close_order(self, ticket):
         data = self._request_and_wait(self.push_socket, 'CLOSE_ORDER', ticket)
         if data != "OK":
-            raise RuntimeError(f"Modify order {ticket} error: {data}")
+            raise RuntimeError(f"Close order {ticket} error: {data}")
+        return True
+
+    def cancel_order(self, ticket):
+        data = self._request_and_wait(self.push_socket, 'CANCEL_ORDER', ticket)
+        if data != "OK":
+            raise RuntimeError(f"Cancel order {ticket} error: {data}")
         return True
 
     ### helpers
