@@ -56,19 +56,21 @@ private:
    Instrument        instruments[];
 
    void              parseRate(MqlRates& rate, string &result);
-   void              parseMarketInfo(string symbol, string &result);
+   void              parseMarket(string symbol, string &result);
+   void              parseQuote(string symbol, string &result);
 
 public:
    void              MTMarkets();
    bool              getMarkets(string &result);
-   bool              getHistory(string symbol, ENUM_TIMEFRAMES period, datetime startTime, datetime endTime, string &result);
 
+   bool              getBars(string symbol, ENUM_TIMEFRAMES period, datetime startTime, datetime endTime, string &result);
    bool              subscribeBar(string symbol, ENUM_TIMEFRAMES period);
    bool              unsubscribeBar(string symbol, ENUM_TIMEFRAMES period);
    bool              hasBarSubscribers(void);
    void              clearBarSubscribers(void);
    bool              getLastBars(string &result);
 
+   bool              getQuotes(string &result);
    bool              subscribeQuote(string symbol);
    bool              unsubscribeQuote(string symbol);
    bool              hasQuoteSubscribers(void);
@@ -87,6 +89,8 @@ void MTMarkets::MTMarkets()
 //+------------------------------------------------------------------+
 bool MTMarkets::getMarkets(string &result)
   {
+   RefreshRates();
+
    int total = SymbolsTotal(false);
    if(total == 0)
       return true;
@@ -94,7 +98,7 @@ bool MTMarkets::getMarkets(string &result)
    for(int i = 0; i< total; i++)
      {
       string symbol = SymbolName(i, false);
-      this.parseMarketInfo(symbol, result);
+      this.parseMarket(symbol, result);
      }
 
    if(total > 0)
@@ -106,7 +110,26 @@ bool MTMarkets::getMarkets(string &result)
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-bool MTMarkets::getHistory(string symbol, ENUM_TIMEFRAMES period, datetime startTime, datetime endTime, string &result)
+void MTMarkets::parseMarket(string symbol, string &result)
+  {
+// SYMBOL|SYMBOL_DESCRIPTION|SYMBOL_CURRENCY_BASE|MODE_POINT|MODE_DIGITS|MODE_MINLOT|MODE_LOTSTEP|MODE_MAXLOT|MODE_TICKSIZE|TIME_GMTOFFSET
+   StringAdd(result, StringFormat("%s|%s|%s|%g|%g|%g|%g|%g|%g|%g|%g;",
+                                  symbol,
+                                  SymbolInfoString(symbol, SYMBOL_DESCRIPTION),
+                                  SymbolInfoString(symbol, SYMBOL_CURRENCY_BASE),
+                                  MarketInfo(symbol, MODE_POINT),
+                                  MarketInfo(symbol, MODE_DIGITS),
+                                  MarketInfo(symbol, MODE_MINLOT),
+                                  MarketInfo(symbol, MODE_LOTSTEP),
+                                  MarketInfo(symbol, MODE_MAXLOT),
+                                  MarketInfo(symbol, MODE_TICKSIZE),
+                                  TimeGMTOffset()
+                                 ));
+  }
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+bool MTMarkets::getBars(string symbol, ENUM_TIMEFRAMES period, datetime startTime, datetime endTime, string &result)
   {
    MqlRates ratesArray[];
    int ratesCount = 0;
@@ -249,6 +272,30 @@ void MTMarkets::parseRate(MqlRates& rate, string &result)
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
+bool MTMarkets::getQuotes(string &result)
+  {
+   RefreshRates();
+
+   int total = SymbolsTotal(true);
+   if(total == 0)
+      return true;
+
+   for(int i = 0; i< total; i++)
+     {
+      string symbol = SymbolName(i, true);
+      this.parseQuote(symbol, result);
+     }
+
+   if(total > 0)
+     {
+      result = StringSubstr(result, 0, StringLen(result)-1);
+     }
+   return true;
+  }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
 bool MTMarkets::subscribeQuote(string symbol)
   {
    int size = ArraySize(this.symbols);
@@ -291,11 +338,13 @@ void MTMarkets::clearQuoteSubscribers(void)
 //+------------------------------------------------------------------+
 bool MTMarkets::getLastQuotes(string &result)
   {
+   RefreshRates();
+
    int size = ArraySize(this.symbols);
    for(int i = 0; i < size; i++)
      {
       string symbol = this.symbols[i];
-      this.parseMarketInfo(symbol, result);
+      this.parseMarket(symbol, result);
      }
 
    if(size > 0)
@@ -304,28 +353,34 @@ bool MTMarkets::getLastQuotes(string &result)
      }
    return true;
   }
-
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-void MTMarkets::parseMarketInfo(string symbol, string &result)
+void MTMarkets::parseQuote(string symbol, string &result)
   {
-// SYMBOL|SYMBOL_DESCRIPTION|SYMBOL_CURRENCY_BASE|MODE_LOW|MODE_HIGH|MODE_BID|MODE_ASK|MODE_POINT|MODE_DIGITS|MODE_SPREAD|MODE_TICKSIZE|MODE_MINLOT|MODE_LOTSTEP|MODE_MAXLOT
-   StringAdd(result, StringFormat("%s|%s|%s|%g|%g|%g|%g|%g|%g|%g|%g|%g|%g|%g;",
+   double bid = MarketInfo(symbol, MODE_BID);
+   double ask = MarketInfo(symbol, MODE_ASK);
+   double last = NormalizeDouble((bid + ask) / 2, Digits());
+   double spread = MarketInfo(symbol, MODE_SPREAD);
+
+   double open = iOpen(symbol, PERIOD_D1, 0);
+   double high = iHigh(symbol, PERIOD_D1, 0);
+   double low = iLow(symbol, PERIOD_D1, 0);
+   double close = iClose(symbol, PERIOD_D1, 0);
+   long volume = iVolume(symbol, PERIOD_D1, 0);
+
+   double prevClose = iClose(symbol, PERIOD_D1, 1);
+   double change = close - prevClose;
+   double changePercent = 0;
+   if(prevClose > 0)
+      changePercent = (close - prevClose)/prevClose*100;
+
+// SYMBOL|OPEN|HIGH|LOW|CLOSE|VOLUME|BID|ASK|LAST|SPREAD|PREV_CLOSE|CHANGE|CHANGE_PERCENT
+   StringAdd(result, StringFormat("%s|%g|%g|%g|%g|%g|%g|%g|%g|%g|%g|%g|%g;",
                                   symbol,
-                                  SymbolInfoString(symbol, SYMBOL_DESCRIPTION),
-                                  SymbolInfoString(symbol, SYMBOL_CURRENCY_BASE),
-                                  MarketInfo(symbol, MODE_LOW),
-                                  MarketInfo(symbol, MODE_HIGH),
-                                  MarketInfo(symbol, MODE_BID),
-                                  MarketInfo(symbol, MODE_ASK),
-                                  MarketInfo(symbol, MODE_POINT),
-                                  MarketInfo(symbol, MODE_DIGITS),
-                                  MarketInfo(symbol, MODE_SPREAD),
-                                  MarketInfo(symbol, MODE_TICKSIZE),
-                                  MarketInfo(symbol, MODE_MINLOT),
-                                  MarketInfo(symbol, MODE_LOTSTEP),
-                                  MarketInfo(symbol, MODE_MAXLOT)
+                                  open, high, low, close, volume,
+                                  bid, ask, last, spread,
+                                  prevClose, change, changePercent
                                  ));
   }
 //+------------------------------------------------------------------+

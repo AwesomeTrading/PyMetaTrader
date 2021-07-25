@@ -47,15 +47,19 @@ private:
    void              processRequest(string &compArray[]);
    void              processRequestPing(string &params[]);
 
+   // market
+   void              processRequestBars(string &params[]);
    void              processRequestSubBars(string &params[]);
    void              processRequestUnsubBars(string &params[]);
+
+   void              processRequestQuotes(string &params[]);
    void              processRequestSubQuotes(string &params[]);
    void              processRequestUnsubQuotes(string &params[]);
 
    void              processRequestTime(string &params[]);
-   void              processRequestHistory(string &params[]);
    void              processRequestMarkets(string &params[]);
 
+   // account
    void              processRequestFund(string &params[]);
    void              processRequestOrders(string &params[]);
    void              processRequestTrades(string &params[]);
@@ -342,6 +346,11 @@ void MTServer::processRequest(string &params[])
      }
 
 // markets
+   if(action == "BARS")
+     {
+      this.processRequestBars(params);
+      return;
+     }
    if(action == "SUB_BARS")
      {
       this.processRequestSubBars(params);
@@ -350,6 +359,11 @@ void MTServer::processRequest(string &params[])
    if(action == "UNSUB_BARS")
      {
       this.processRequestUnsubBars(params);
+      return;
+     }
+   if(action == "QUOTES")
+     {
+      this.processRequestQuotes(params);
       return;
      }
    if(action == "SUB_QUOTES")
@@ -365,11 +379,6 @@ void MTServer::processRequest(string &params[])
    if(action == "MARKETS")
      {
       this.processRequestMarkets(params);
-      return;
-     }
-   if(action == "HISTORY")
-     {
-      this.processRequestHistory(params);
       return;
      }
    if(action == "TIME")
@@ -430,6 +439,22 @@ void MTServer::processRequestPing(string &params[])
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
+void MTServer::processRequestBars(string &params[])
+  {
+   string symbol = params[2];
+   ENUM_TIMEFRAMES period = GetTimeframe(params[3]);
+   datetime startTime = TimestampToTime(params[4]);
+   datetime endTime = TimestampToTime(params[5]);
+
+   string result = StringFormat("BARS|%s|%s|%s|", params[1], params[2], params[3]);
+
+   this.markets.getBars(symbol, period, startTime, endTime, result);
+   this.reply(pushSocket, result);
+  }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
 void MTServer::processRequestSubBars(string &params[])
   {
    string symbol = params[2];
@@ -450,6 +475,16 @@ void MTServer::processRequestUnsubBars(string &params[])
    this.markets.unsubscribeBar(symbol, period);
 
    string result = StringFormat("UNSUB_BARS|%s|OK", params[1]);
+   this.reply(pushSocket, result);
+  }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+void MTServer::processRequestQuotes(string &params[])
+  {
+   string result = StringFormat("QUOTES|%s|", params[1]);
+   this.markets.getQuotes(result);
    this.reply(pushSocket, result);
   }
 
@@ -483,22 +518,6 @@ void MTServer::processRequestUnsubQuotes(string &params[])
 void MTServer::processRequestTime(string &params[])
   {
    string result = StringFormat("TIME|%s|%f", params[1], TimeCurrent());
-   this.reply(pushSocket, result);
-  }
-
-//+------------------------------------------------------------------+
-//|                                                                  |
-//+------------------------------------------------------------------+
-void MTServer::processRequestHistory(string &params[])
-  {
-   string symbol = params[2];
-   ENUM_TIMEFRAMES period = GetTimeframe(params[3]);
-   datetime startTime = TimestampToTime(params[4]);
-   datetime endTime = TimestampToTime(params[5]);
-
-   string result = StringFormat("HISTORY|%s|%s|%s|", params[1], params[2], params[3]);
-
-   this.markets.getHistory(symbol, period, startTime, endTime, result);
    this.reply(pushSocket, result);
   }
 

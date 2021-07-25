@@ -175,18 +175,12 @@ class MetaTrader():
             return result
 
         if type == "QUOTES":
-            result = []
-            raws = data.split(";")
-            for raw in raws:
-                quote = self._parse_market(raw)
-                result.append(quote)
-            return result
+            return self._parse_quotes(data)
 
         if type == "ORDERS":
             result = []
             raws = data.split(";")
             for raw in raws:
-                print(raw)
                 event, order = raw.split("|", 1)
                 order = self._parse_order(order)
                 order['status'] = event
@@ -221,7 +215,7 @@ class MetaTrader():
 
     def get_bars(self, symbol, timeframe, start, end):
         request = "{};{};{};{}".format(symbol, timeframe, start, end)
-        data = self._request_and_wait(self.push_socket, 'HISTORY', request)
+        data = self._request_and_wait(self.push_socket, 'BARS', request)
         return self._parse_bars(data)
 
     def _parse_bars(self, data):
@@ -255,27 +249,44 @@ class MetaTrader():
             markets.append(self._parse_market(raw))
         return markets
 
-    # SYMBOL|SYMBOL_DESCRIPTION|SYMBOL_CURRENCY_BASE|MODE_LOW|MODE_HIGH|MODE_BID|MODE_ASK|MODE_POINT|MODE_DIGITS|MODE_SPREAD|MODE_TICKSIZE|MODE_MINLOT|MODE_LOTSTEP|MODE_MAXLOT
+    # SYMBOL|SYMBOL_DESCRIPTION|SYMBOL_CURRENCY_BASE|MODE_POINT|MODE_DIGITS|MODE_MINLOT|MODE_LOTSTEP|MODE_MAXLOT|MODE_TICKSIZE|TIME_GMTOFFSET
     _market_keys = [['symbol', str], ['description', str], ['currency', str],
-                    ['low', float], ['high', float], ['bid', float],
-                    ['ask', float], ['point', float], ['digits', float],
-                    ['spread', float], ['ticksize', float], ['minlot', float],
-                    ['lotstep', float], ['maxlot', float]]
+                    ['point', float], ['digits', float], ['minlot', float],
+                    ['lotstep', float], ['maxlot', float], ['ticksize', float],
+                    ['gmt_offset', float]]
 
     def _parse_market(self, data):
         return self._parse_data_by_keys(data, self._market_keys)
 
     # quote
     def get_quotes(self, symbols=[]):
-        markets = self.get_markets()
+        quotes = self._request_and_wait(self.push_socket, 'QUOTES')
+        quotes = self._parse_quotes(quotes)
         if not symbols:
-            return markets
+            return quotes
 
         results = []
-        for market in markets:
-            if market['symbol'] in symbols:
-                results.append(market)
+        for quote in quotes:
+            if quote['symbol'] in symbols:
+                results.append(quote)
         return results
+
+    def _parse_quotes(self, data):
+        raws = data.split(';')
+        quotes = []
+        for raw in raws:
+            quotes.append(self._parse_quote(raw))
+        return quotes
+
+    # SYMBOL|OPEN|HIGH|LOW|CLOSE|VOLUME|BID|ASK|LAST|SPREAD|PREV_CLOSE|CHANGE|CHANGE_PERCENT
+    _quote_keys = [['symbol', str], ['open', float], ['high', float],
+                   ['low', float], ['close', float], ['volume', float],
+                   ['bid', float], ['ask', float], ['last', float],
+                   ['spread', float], ['prev_close', float], ['change', float],
+                   ['change_percent', float]]
+
+    def _parse_quote(self, data):
+        return self._parse_data_by_keys(data, self._quote_keys)
 
     def subscribe_quotes(self, symbol):
         data = self._request_and_wait(self.push_socket, 'SUB_QUOTES', symbol)
