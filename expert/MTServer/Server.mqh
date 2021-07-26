@@ -32,7 +32,6 @@ private:
    bool              stopSockets();
    bool              status();
    void              reply(Socket& socket, string message);
-   void              replyOrderEvents(string events);
 
    // subscribers
    void              checkSubscribers();
@@ -44,6 +43,7 @@ private:
    // request
    void              checkRequest();
    void              parseRequest(string& message, string& retArray[]);
+   void              requestReply(string &id, string &message);
    void              processRequest(string &compArray[]);
    void              processRequestPing(string &params[]);
 
@@ -235,14 +235,6 @@ void MTServer::reply(Socket& socket, string message)
       Print("[ERROR] Cannot send data to socket");
      }
   }
-//+------------------------------------------------------------------+
-//|                                                                  |
-//+------------------------------------------------------------------+
-void MTServer::replyOrderEvents(string events)
-  {
-   string result = StringFormat("ORDERS %s", events);
-   this.reply(pubSocket, result);
-  }
 
 //+------------------------------------------------------------------+
 //|                                                                  |
@@ -319,6 +311,10 @@ void MTServer::checkRequest()
 
 // Interpret data
    this.processRequest(params);
+
+   int errorCode = GetLastError();
+   if(errorCode != 0)
+      PrintFormat("ERROR request[%s]: (%d) %s", dataStr, errorCode, ErrorDescription(errorCode));
   }
 
 //+------------------------------------------------------------------+
@@ -327,8 +323,27 @@ void MTServer::checkRequest()
 void MTServer::parseRequest(string& message, string& result[])
   {
    Print("Request: " + message);
-   ushort u_sep = StringGetCharacter(";", 0);
-   int splits = StringSplit(message, u_sep, result);
+   ushort separator = StringGetCharacter(";", 0);
+   int splits = StringSplit(message, separator, result);
+  }
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+void MTServer::requestReply(string &id, string &message)
+  {
+   int errorCode = GetLastError();
+   string msg;
+   if(errorCode == 0)
+     {
+      msg = StringFormat("OK|%s|", id);
+      StringAdd(msg, message);
+     }
+   else
+     {
+      msg = StringFormat("KO|%s|%s", id, GetErrorDescription(errorCode));
+     }
+
+   this.reply(pushSocket, msg);
   }
 
 //+------------------------------------------------------------------+
@@ -431,9 +446,8 @@ void MTServer::processRequest(string &params[])
 void MTServer::processRequestPing(string &params[])
   {
    this.pingExpire = TimeCurrent() + 30; // expire at next 30 seconds
-
-   string result = StringFormat("PING|%s|PONG", params[1]);
-   this.reply(pushSocket, result);
+   string result = "PONG";
+   this.requestReply(params[1], result);
   }
 
 //+------------------------------------------------------------------+
@@ -446,10 +460,9 @@ void MTServer::processRequestBars(string &params[])
    datetime startTime = TimestampToTime(params[4]);
    datetime endTime = TimestampToTime(params[5]);
 
-   string result = StringFormat("BARS|%s|%s|%s|", params[1], params[2], params[3]);
-
+   string result = "";
    this.markets.getBars(symbol, period, startTime, endTime, result);
-   this.reply(pushSocket, result);
+   this.requestReply(params[1], result);
   }
 
 //+------------------------------------------------------------------+
@@ -460,9 +473,8 @@ void MTServer::processRequestSubBars(string &params[])
    string symbol = params[2];
    ENUM_TIMEFRAMES period = GetTimeframe(params[3]);
    this.markets.subscribeBar(symbol, period);
-
-   string result = StringFormat("SUB_BARS|%s|OK", params[1]);
-   this.reply(pushSocket, result);
+   string result = "OK";
+   this.requestReply(params[1], result);
   }
 
 //+------------------------------------------------------------------+
@@ -474,8 +486,8 @@ void MTServer::processRequestUnsubBars(string &params[])
    ENUM_TIMEFRAMES period = GetTimeframe(params[3]);
    this.markets.unsubscribeBar(symbol, period);
 
-   string result = StringFormat("UNSUB_BARS|%s|OK", params[1]);
-   this.reply(pushSocket, result);
+   string result = "OK";
+   this.requestReply(params[1], result);
   }
 
 //+------------------------------------------------------------------+
@@ -483,9 +495,9 @@ void MTServer::processRequestUnsubBars(string &params[])
 //+------------------------------------------------------------------+
 void MTServer::processRequestQuotes(string &params[])
   {
-   string result = StringFormat("QUOTES|%s|", params[1]);
+   string result = "";
    this.markets.getQuotes(result);
-   this.reply(pushSocket, result);
+   this.requestReply(params[1], result);
   }
 
 //+------------------------------------------------------------------+
@@ -496,8 +508,8 @@ void MTServer::processRequestSubQuotes(string &params[])
    string symbol = params[2];
    this.markets.subscribeQuote(symbol);
 
-   string result = StringFormat("SUB_QUOTES|%s|OK", params[1]);
-   this.reply(pushSocket, result);
+   string result = "OK";
+   this.requestReply(params[1], result);
   }
 
 //+------------------------------------------------------------------+
@@ -508,8 +520,8 @@ void MTServer::processRequestUnsubQuotes(string &params[])
    string symbol = params[2];
    this.markets.unsubscribeQuote(symbol);
 
-   string result = StringFormat("UNSUB_QUOTES|%s|OK", params[1]);
-   this.reply(pushSocket, result);
+   string result = "OK";
+   this.requestReply(params[1], result);
   }
 
 //+------------------------------------------------------------------+
@@ -517,8 +529,8 @@ void MTServer::processRequestUnsubQuotes(string &params[])
 //+------------------------------------------------------------------+
 void MTServer::processRequestTime(string &params[])
   {
-   string result = StringFormat("TIME|%s|%f", params[1], TimeCurrent());
-   this.reply(pushSocket, result);
+   string result = StringFormat("%f", TimeCurrent());
+   this.requestReply(params[1], result);
   }
 
 //+------------------------------------------------------------------+
@@ -526,9 +538,9 @@ void MTServer::processRequestTime(string &params[])
 //+------------------------------------------------------------------+
 void MTServer::processRequestMarkets(string &params[])
   {
-   string result = StringFormat("MARKETS|%s|", params[1]);
+   string result = "";
    this.markets.getMarkets(result);
-   this.reply(pushSocket, result);
+   this.requestReply(params[1], result);
   }
 
 //+------------------------------------------------------------------+
@@ -536,9 +548,9 @@ void MTServer::processRequestMarkets(string &params[])
 //+------------------------------------------------------------------+
 void MTServer::processRequestFund(string &params[])
   {
-   string result = StringFormat("FUND|%s|", params[1]);
+   string result = "";
    this.account.getFund(result);
-   this.reply(pushSocket, result);
+   this.requestReply(params[1], result);
   }
 
 //+------------------------------------------------------------------+
@@ -548,9 +560,10 @@ void MTServer::processRequestTrades(string &params[])
   {
    string symbol = params[2];
    int modes[] = {OP_BUY, OP_SELL};
-   string result = StringFormat("TRADES|%s|", params[1]);
+
+   string result = "";
    this.account.getOrders(symbol, modes, result);
-   this.reply(pushSocket, result);
+   this.requestReply(params[1], result);
   }
 
 //+------------------------------------------------------------------+
@@ -560,9 +573,10 @@ void MTServer::processRequestOrders(string &params[])
   {
    string symbol = params[2];
    int modes[] = {};
-   string result = StringFormat("ORDERS|%s|", params[1]);
+
+   string result = "";
    this.account.getOrders(symbol, modes, result);
-   this.reply(pushSocket, result);
+   this.requestReply(params[1], result);
   }
 
 //+------------------------------------------------------------------+
@@ -578,18 +592,16 @@ void MTServer::processRequestOpenOrder(string &params[])
    double tp = StringToDouble(params[7]);
    string comment = params[8];
 
-   string result = StringFormat("OPEN_ORDER|%s|", params[1]);
+   string result = "";
    int ticket = this.account.openOrder(symbol, type, lots, price, sl, tp, comment, result);
-   if(ticket >= 0)
-     {
-      StringAdd(result, IntegerToString(ticket));
-     }
-   this.reply(pushSocket, result);
+
+   StringAdd(result, IntegerToString(ticket));
+   this.requestReply(params[1], result);
 
 // put event OPEN ORDER
-   string event = "";
+   string event = "ORDERS ";
    this.account.getOrderEventByTicket(ticket, EVENT_ORDER_OPENED, event);
-   this.replyOrderEvents(event);
+   this.reply(pubSocket, result);
   }
 
 //+------------------------------------------------------------------+
@@ -608,19 +620,14 @@ void MTServer::processRequestModifyOrder(string &params[])
       expiration = TimestampToTime(expireTimestamp);
 
 // process
-   string result = StringFormat("MODIFY_ORDER|%s|", params[1]);
+   string result = "";
    bool ok = this.account.modifyOrder(ticket, price, sl, tp, expiration, result);
-   if(ok)
-      StringAdd(result, "OK");
-   else
-      StringAdd(result, GetLastErrorMessage());
-
-   this.reply(pushSocket, result);
+   this.requestReply(params[1], result);
 
 // put event MODIFY ORDER
-   string event = "";
+   string event = "ORDERS ";
    this.account.getOrderEventByTicket(ticket, EVENT_ORDER_MODIFIED, event);
-   this.replyOrderEvents(event);
+   this.reply(pubSocket, result);
   }
 
 //+------------------------------------------------------------------+
@@ -630,19 +637,14 @@ void MTServer::processRequestCloseOrder(string &params[])
   {
    int ticket = StrToInteger(params[2]);
 
-   string result = StringFormat("CLOSE_ORDER|%s|", params[1]);
+   string result = "";
    bool ok = this.account.closeOrder(ticket, result);
-   if(ok)
-      StringAdd(result, "OK");
-   else
-      StringAdd(result, GetLastErrorMessage());
-
-   this.reply(pushSocket, result);
+   this.requestReply(params[1], result);
 
 // put event COMPLETED ORDER
-   string event = "";
+   string event = "ORDERS ";
    this.account.getOrderEventByTicket(ticket, EVENT_ORDER_COMPLETED, event);
-   this.replyOrderEvents(event);
+   this.reply(pubSocket, result);
   }
 
 //+------------------------------------------------------------------+
@@ -662,8 +664,8 @@ void MTServer::processRequestCancelOrder(string &params[])
    this.reply(pushSocket, result);
 
 // put event CANCEL ORDER
-   string event = "";
+   string event = "ORDERS ";
    this.account.getOrderEventByTicket(ticket, EVENT_ORDER_CANCELED, event);
-   this.replyOrderEvents(event);
+   this.reply(pubSocket, result);
   }
 //+------------------------------------------------------------------+

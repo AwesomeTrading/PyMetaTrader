@@ -138,9 +138,9 @@ class MetaTrader():
 
                 # pull socket
                 try:
-                    type, id, data = msg.split("|", 2)
+                    ok, id, data = msg.split("|", 2)
                     if id in self.waiters:
-                        self.waiters[id].put(data)
+                        self.waiters[id].put((ok == "OK", data))
                     else:
                         print("Abandoned message: ", msg)
                 except Exception as e:
@@ -158,11 +158,15 @@ class MetaTrader():
     def _request_and_wait(self, socket, action, msg=''):
         id, q = self._request(socket, action, msg)
         try:
-            return q.get(timeout=self.wait_timeout)
+            ok, data = q.get(timeout=self.wait_timeout)
         except queue.Empty:
             raise RuntimeError("No data response")
         finally:
             del self.waiters[id]
+
+        if not ok:
+            raise RuntimeError(f"Error request[{action} {msg}]: {data}")
+        return data
 
     def _parse_subcribe_data(self, type, data):
         if type == "BARS":
@@ -206,12 +210,12 @@ class MetaTrader():
     def subscribe_bars(self, symbol, timeframe):
         request = "{};{}".format(symbol, timeframe)
         data = self._request_and_wait(self.push_socket, 'SUB_BARS', request)
-        return data == "OK"
+        return True
 
     def unsubscribe_bars(self, symbol, timeframe):
         request = "{};{}".format(symbol, timeframe)
         data = self._request_and_wait(self.push_socket, 'UNSUB_BARS', request)
-        return data == "OK"
+        return True
 
     def get_bars(self, symbol, timeframe, start, end):
         request = "{};{};{};{}".format(symbol, timeframe, start, end)
@@ -219,7 +223,7 @@ class MetaTrader():
         return self._parse_bars(data)
 
     def _parse_bars(self, data):
-        data = data.split('|', 2)[2]
+        # data = data.split('|', 2)[2]
         raws = data.split(';')
         bars = []
         for raw in raws:
@@ -290,11 +294,11 @@ class MetaTrader():
 
     def subscribe_quotes(self, symbol):
         data = self._request_and_wait(self.push_socket, 'SUB_QUOTES', symbol)
-        return data == "OK"
+        return True
 
     def unsubscribe_quotes(self, symbol):
         data = self._request_and_wait(self.push_socket, 'UNSUB_QUOTES', symbol)
-        return data == "OK"
+        return True
 
     ### ACCOUNT
     # fund
@@ -348,8 +352,6 @@ class MetaTrader():
         request = f"{ticket};{price};{sl};{tp};{expiration}"
         data = self._request_and_wait(self.push_socket, 'MODIFY_ORDER',
                                       request)
-        if data != "OK":
-            raise RuntimeError(f"Modify order {request} error: {data}")
         return True
 
     def close_order(self, ticket):

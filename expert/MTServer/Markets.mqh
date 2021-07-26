@@ -113,7 +113,7 @@ bool MTMarkets::getMarkets(string &result)
 void MTMarkets::parseMarket(string symbol, string &result)
   {
 // SYMBOL|SYMBOL_DESCRIPTION|SYMBOL_CURRENCY_BASE|MODE_POINT|MODE_DIGITS|MODE_MINLOT|MODE_LOTSTEP|MODE_MAXLOT|MODE_TICKSIZE|TIME_GMTOFFSET
-   StringAdd(result, StringFormat("%s|%s|%s|%g|%g|%g|%g|%g|%g|%g|%g;",
+   StringAdd(result, StringFormat("%s|%s|%s|%g|%g|%g|%g|%g|%g|%g;",
                                   symbol,
                                   SymbolInfoString(symbol, SYMBOL_DESCRIPTION),
                                   SymbolInfoString(symbol, SYMBOL_CURRENCY_BASE),
@@ -125,13 +125,15 @@ void MTMarkets::parseMarket(string symbol, string &result)
                                   MarketInfo(symbol, MODE_TICKSIZE),
                                   TimeGMTOffset()
                                  ));
+// bypass: error when get MarketInfo with symbol not in MarketWatch
+   GetLastError();
   }
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
 bool MTMarkets::getBars(string symbol, ENUM_TIMEFRAMES period, datetime startTime, datetime endTime, string &result)
   {
-   MqlRates ratesArray[];
+   MqlRates rates[];
    int ratesCount = 0;
 
 // Handling ERR_HISTORY_WILL_UPDATED (4066) and ERR_NO_HISTORY_DATA (4073) errors.
@@ -139,9 +141,11 @@ bool MTMarkets::getBars(string symbol, ENUM_TIMEFRAMES period, datetime startTim
 // But even after 10 requests it can happen that it is not available. So it is best to have the charts open.
    for(int i=0; i<10; i++)
      {
-      ratesCount = CopyRates(symbol, period, startTime, endTime, ratesArray);
+      ratesCount = CopyRates(symbol, period, startTime, endTime, rates);
       int errorCode = GetLastError();
-      // Print("errorCode: ", errorCode);
+      if(errorCode != 0)
+         PrintFormat("GetBars error [%d]: %s", errorCode, ErrorDescription(errorCode));
+
       if(ratesCount > 0 || (errorCode != 4066 && errorCode != 4073))
          break;
 
@@ -155,7 +159,7 @@ bool MTMarkets::getBars(string symbol, ENUM_TIMEFRAMES period, datetime startTim
 // add history to response string
    for(int i = 0; i < ratesCount; i++)
      {
-      this.parseRate(ratesArray[i], result);
+      this.parseRate(rates[i], result);
      }
 
    if(ratesCount > 0)
@@ -368,6 +372,8 @@ void MTMarkets::parseQuote(string symbol, string &result)
    double low = iLow(symbol, PERIOD_D1, 0);
    double close = iClose(symbol, PERIOD_D1, 0);
    long volume = iVolume(symbol, PERIOD_D1, 0);
+// bypass: skip download bar data if missing data
+   GetLastError();
 
    double prevClose = iClose(symbol, PERIOD_D1, 1);
    double change = close - prevClose;
