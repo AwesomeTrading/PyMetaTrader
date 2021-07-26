@@ -366,13 +366,15 @@ class MetaTrader():
 
     ### helpers
     def _parse_data_by_keys(self, data, keys):
-        try:
-            raw = data.split('|')
-            result = dict()
-            for i in range(0, len(keys)):
+        raw = data.split('|')
+        result = dict()
+        for i in range(0, len(keys)):
+            try:
                 key = keys[i][0]
                 type = keys[i][1]
                 result[key] = type(raw[i])
-            return result
-        except:
-            raise RuntimeError(f"Cannot parse data {data} by keys {keys}")
+            except:
+                raise RuntimeError(
+                    f"Cannot parse data {data} by key {key}, type {type} and value {raw[i]}"
+                )
+        return result

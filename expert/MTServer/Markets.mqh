@@ -344,7 +344,7 @@ bool MTMarkets::getLastQuotes(string &result)
    for(int i = 0; i < size; i++)
      {
       string symbol = this.symbols[i];
-      this.parseMarket(symbol, result);
+      this.parseQuote(symbol, result);
      }
 
    if(size > 0)
