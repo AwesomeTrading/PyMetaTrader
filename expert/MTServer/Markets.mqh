@@ -135,18 +135,20 @@ bool MTMarkets::getBars(string symbol, ENUM_TIMEFRAMES period, datetime startTim
   {
    MqlRates rates[];
    int ratesCount = 0;
+   if(endTime > TimeCurrent())
+      endTime = TimeCurrent();
 
 // Handling ERR_HISTORY_WILL_UPDATED (4066) and ERR_NO_HISTORY_DATA (4073) errors.
 // For non-chart symbols and time frames MT4 often needs a few requests until the data is available.
 // But even after 10 requests it can happen that it is not available. So it is best to have the charts open.
-   for(int i=0; i<10; i++)
+   for(int i=0; i<5; i++)
      {
       ratesCount = CopyRates(symbol, period, startTime, endTime, rates);
       int errorCode = GetLastError();
       if(errorCode != 0)
-         PrintFormat("GetBars error [%d]: %s", errorCode, ErrorDescription(errorCode));
+         PrintFormat("getBars error [%d]: %s", errorCode, ErrorDescription(errorCode));
 
-      if(ratesCount > 0 || (errorCode != 4066 && errorCode != 4073))
+      if(ratesCount > 0 && rates[ratesCount-1].time > endTime - period*60)
          break;
 
       Sleep(200);

@@ -671,3 +671,10 @@ datetime TimestampToTime(double timestamp)
    return (datetime)timestamp + TimeGMTOffset();
   }
 //+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+datetime TimestampToGMTTime(double timestamp)
+  {
+   return (datetime)timestamp;
+  }
+//+------------------------------------------------------------------+
