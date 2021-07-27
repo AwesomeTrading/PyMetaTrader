@@ -601,7 +601,7 @@ void MTServer::processRequestOpenOrder(string &params[])
 // put event OPEN ORDER
    string event = "ORDERS ";
    this.account.getOrderEventByTicket(ticket, EVENT_ORDER_OPENED, event);
-   this.reply(pubSocket, result);
+   this.reply(pubSocket, event);
   }
 
 //+------------------------------------------------------------------+
@@ -627,7 +627,7 @@ void MTServer::processRequestModifyOrder(string &params[])
 // put event MODIFY ORDER
    string event = "ORDERS ";
    this.account.getOrderEventByTicket(ticket, EVENT_ORDER_MODIFIED, event);
-   this.reply(pubSocket, result);
+   this.reply(pubSocket, event);
   }
 
 //+------------------------------------------------------------------+
@@ -644,7 +644,7 @@ void MTServer::processRequestCloseOrder(string &params[])
 // put event COMPLETED ORDER
    string event = "ORDERS ";
    this.account.getOrderEventByTicket(ticket, EVENT_ORDER_COMPLETED, event);
-   this.reply(pubSocket, result);
+   this.reply(pubSocket, event);
   }
 
 //+------------------------------------------------------------------+
@@ -666,6 +666,6 @@ void MTServer::processRequestCancelOrder(string &params[])
 // put event CANCEL ORDER
    string event = "ORDERS ";
    this.account.getOrderEventByTicket(ticket, EVENT_ORDER_CANCELED, event);
-   this.reply(pubSocket, result);
+   this.reply(pubSocket, event);
   }
 //+------------------------------------------------------------------+
