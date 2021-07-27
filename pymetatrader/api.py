@@ -124,27 +124,27 @@ class MetaTrader():
 
             sockets = dict(self.poller.poll(timeout))
             for socket in sockets:
-                msg = self._recv(socket)
-                if not msg:
-                    break
-
-                # print("msg ", msg)
-                # sub socket
-                if socket == self.sub_socket:
-                    type, data = msg.split(" ", 1)
-                    data = self._parse_subcribe_data(type, data)
-                    self.q_sub.put((type, data))
-                    continue
-
-                # pull socket
                 try:
+                    msg = self._recv(socket)
+                    if not msg:
+                        continue
+
+                    # print("msg ", msg)
+                    # sub socket
+                    if socket == self.sub_socket:
+                        type, data = msg.split(" ", 1)
+                        data = self._parse_subcribe_data(type, data)
+                        self.q_sub.put((type, data))
+                        continue
+
+                    # pull socket
                     ok, id, data = msg.split("|", 2)
                     if id in self.waiters:
                         self.waiters[id].put((ok == "OK", data))
                     else:
                         print("Abandoned message: ", msg)
                 except Exception as e:
-                    print("Wait data error: ", e)
+                    print("Wait socket data error: ", e)
 
     def _request(self, socket, action, msg=''):
         request_id = random_id()
