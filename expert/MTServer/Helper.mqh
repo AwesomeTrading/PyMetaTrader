@@ -673,6 +673,13 @@ datetime TimestampToTime(double timestamp)
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
+datetime TimestampToGMTTime(string timestamp)
+  {
+   return TimestampToGMTTime(StringToDouble(timestamp));
+  }
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
 datetime TimestampToGMTTime(double timestamp)
   {
    return (datetime)timestamp;

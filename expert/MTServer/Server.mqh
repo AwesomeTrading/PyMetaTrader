@@ -613,11 +613,7 @@ void MTServer::processRequestModifyOrder(string &params[])
    double price = StringToDouble(params[3]);
    double sl = StringToDouble(params[4]);
    double tp = StringToDouble(params[5]);
-// parse expire time
-   double expireTimestamp = StringToDouble(params[6]);
-   datetime expiration = 0;
-   if(expireTimestamp > 0)
-      expiration = TimestampToTime(expireTimestamp);
+   datetime expiration = TimestampToGMTTime(params[6]);
 
 // process
    string result = "";
