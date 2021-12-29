@@ -1,4 +1,4 @@
-init:
+env:
 	conda init bash
 	conda init zsh
 	conda create -y --prefix ./.venv python=3.8

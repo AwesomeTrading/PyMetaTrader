@@ -3,6 +3,7 @@
 //+------------------------------------------------------------------+
 int StringToOperationType(string type)
   {
+#ifdef __MQL4__
    if(type == "BUY_MARKET")
       return OP_BUY;
    if(type == "SELL_MARKET")
@@ -15,6 +16,21 @@ int StringToOperationType(string type)
       return OP_BUYSTOP;
    if(type == "SELL_STOP")
       return OP_SELLSTOP;
+#endif
+#ifdef __MQL5__
+   if(type == "BUY_MARKET")
+      return ORDER_TYPE_BUY;
+   if(type == "SELL_MARKET")
+      return ORDER_TYPE_SELL;
+   if(type == "BUY_LIMIT")
+      return ORDER_TYPE_BUY_LIMIT;
+   if(type == "SELL_LIMIT")
+      return ORDER_TYPE_SELL_LIMIT;
+   if(type == "BUY_STOP")
+      return ORDER_TYPE_BUY_STOP;
+   if(type == "SELL_STOP")
+      return ORDER_TYPE_SELL_STOP;
+#endif
 
    PrintFormat("Cannot parse operation type %s", type);
    return -1;
@@ -22,26 +38,39 @@ int StringToOperationType(string type)
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-string OperationTypeToString(int type)
+string OperationTypeToString(long type)
   {
-   switch(type)
-     {
-      case OP_BUY:
-         return "BUY_MARKET";
-      case OP_SELL:
-         return "SELL_MARKET";
-      case OP_BUYLIMIT:
-         return "BUY_LIMIT";
-      case OP_SELLLIMIT:
-         return "SELL_LIMIT";
-      case OP_BUYSTOP:
-         return "BUY_STOP";
-      case OP_SELLSTOP:
-         return "SELL_STOP";
-      default:
-         PrintFormat("Operation type %s parse faile", type);
-         return "UNKNOWN";
-     }
+#ifdef __MQL4__
+   if(type == OP_BUY)
+      return "BUY_MARKET";
+   if(type == OP_SELL)
+      return "SELL_MARKET";
+   if(type == OP_BUYLIMIT)
+      return "BUY_LIMIT";
+   if(type == OP_SELLLIMIT)
+      return "SELL_LIMIT";
+   if(type == OP_BUYSTOP)
+      return "BUY_STOP";
+   if(type == OP_SELLSTOP)
+      return "SELL_STOP";
+#endif
+#ifdef __MQL5__
+   if(type == ORDER_TYPE_BUY)
+      return "BUY_MARKET";
+   if(type == ORDER_TYPE_SELL)
+      return "SELL_MARKET";
+   if(type == ORDER_TYPE_BUY_LIMIT)
+      return "BUY_LIMIT";
+   if(type == ORDER_TYPE_SELL_LIMIT)
+      return "SELL_LIMIT";
+   if(type == ORDER_TYPE_BUY_STOP)
+      return "BUY_STOP";
+   if(type == ORDER_TYPE_SELL_STOP)
+      return "SELL_STOP";
+#endif
+
+   PrintFormat("Operation type %s parse faile", type);
+   return "UNKNOWN";
   }
 //+------------------------------------------------------------------+
 //|                                                                  |

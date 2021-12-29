@@ -123,7 +123,9 @@ bool MTServer::stop(void)
 //+------------------------------------------------------------------+
 void MTServer::onTick(void)
   {
+#ifdef __MQL4__
    RefreshRates();
+#endif
    if(TimeCurrent() > this.pingExpire)
      {
       this.pingExpire = TimeCurrent() + 5 * 60; // expire at next 5 minutes
@@ -302,7 +304,7 @@ void MTServer::checkRequest()
    uchar data[];
 
 // Get data from request
-   ArrayResize(data, request.size());
+   ArrayResize(data, (int)request.size());
    request.getData(data);
    string dataStr = CharArrayToString(data);
 
@@ -342,7 +344,8 @@ void MTServer::requestReply(string &id, string &message)
      {
       msg = StringFormat("KO|%s|%s", id, GetErrorDescription(errorCode));
      }
-
+   
+   ResetLastError();
    this.reply(pushSocket, msg);
   }
 
@@ -558,9 +561,14 @@ void MTServer::processRequestFund(string &params[])
 //+------------------------------------------------------------------+
 void MTServer::processRequestTrades(string &params[])
   {
-   string symbol = params[2];
+#ifdef __MQL4__
    int modes[] = {OP_BUY, OP_SELL};
+#endif
+#ifdef __MQL5__
+   int modes[] = {ORDER_TYPE_BUY, ORDER_TYPE_SELL};
+#endif
 
+   string symbol = params[2];
    string result = "";
    this.account.getOrders(symbol, modes, result);
    this.requestReply(params[1], result);
@@ -593,9 +601,9 @@ void MTServer::processRequestOpenOrder(string &params[])
    string comment = params[8];
 
    string result = "";
-   int ticket = this.account.openOrder(symbol, type, lots, price, sl, tp, comment, result);
+   ulong ticket = this.account.openOrder(symbol, type, lots, price, sl, tp, comment, result);
 
-   StringAdd(result, IntegerToString(ticket));
+   StringAdd(result, DoubleToString(ticket));
    this.requestReply(params[1], result);
 
 // put event OPEN ORDER
@@ -609,7 +617,13 @@ void MTServer::processRequestOpenOrder(string &params[])
 //+------------------------------------------------------------------+
 void MTServer::processRequestModifyOrder(string &params[])
   {
-   int ticket = StrToInteger(params[2]);
+#ifdef __MQL4__
+   ulong ticket = StrToInteger(params[2]);
+#endif
+#ifdef __MQL5__
+   ulong ticket = StringToInteger(params[2]);
+#endif
+
    double price = StringToDouble(params[3]);
    double sl = StringToDouble(params[4]);
    double tp = StringToDouble(params[5]);
@@ -631,7 +645,12 @@ void MTServer::processRequestModifyOrder(string &params[])
 //+------------------------------------------------------------------+
 void MTServer::processRequestCloseOrder(string &params[])
   {
-   int ticket = StrToInteger(params[2]);
+#ifdef __MQL4__
+   ulong ticket = StrToInteger(params[2]);
+#endif
+#ifdef __MQL5__
+   ulong ticket = StringToInteger(params[2]);
+#endif
 
    string result = "";
    bool ok = this.account.closeOrder(ticket, result);
@@ -648,7 +667,12 @@ void MTServer::processRequestCloseOrder(string &params[])
 //+------------------------------------------------------------------+
 void MTServer::processRequestCancelOrder(string &params[])
   {
-   int ticket = StrToInteger(params[2]);
+#ifdef __MQL4__
+   ulong ticket = StrToInteger(params[2]);
+#endif
+#ifdef __MQL5__
+   ulong ticket = StringToInteger(params[2]);
+#endif
 
    string result = StringFormat("CANCEL_ORDER|%s|", params[1]);
    bool ok = this.account.cancelOrder(ticket, result);

@@ -208,16 +208,19 @@ class MetaTrader():
 
     # bars
     def subscribe_bars(self, symbol, timeframe):
+        symbol = self._parse_broker_symbol(symbol)
         request = "{};{}".format(symbol, timeframe)
         data = self._request_and_wait(self.push_socket, 'SUB_BARS', request)
         return True
 
     def unsubscribe_bars(self, symbol, timeframe):
+        symbol = self._parse_broker_symbol(symbol)
         request = "{};{}".format(symbol, timeframe)
         data = self._request_and_wait(self.push_socket, 'UNSUB_BARS', request)
         return True
 
     def get_bars(self, symbol, timeframe, start, end):
+        symbol = self._parse_broker_symbol(symbol)
         request = "{};{};{};{}".format(symbol, timeframe, start, end)
         data = self._request_and_wait(self.push_socket, 'BARS', request)
         return self._parse_bars(data)
@@ -260,7 +263,9 @@ class MetaTrader():
                     ['gmt_offset', float]]
 
     def _parse_market(self, data):
-        return self._parse_data_by_keys(data, self._market_keys)
+        market = self._parse_data_by_keys(data, self._market_keys)
+        market['symbol'] = market['symbol'][:3] + '/' + market['symbol'][3:]
+        return market
 
     # quote
     def get_quotes(self, symbols=[]):
@@ -290,13 +295,17 @@ class MetaTrader():
                    ['change_percent', float]]
 
     def _parse_quote(self, data):
-        return self._parse_data_by_keys(data, self._quote_keys)
+        quote = self._parse_data_by_keys(data, self._quote_keys)
+        quote['symbol'] = quote['symbol'][:3] + '/' + quote['symbol'][3:]
+        return quote
 
     def subscribe_quotes(self, symbol):
+        symbol = self._parse_broker_symbol(symbol)
         data = self._request_and_wait(self.push_socket, 'SUB_QUOTES', symbol)
         return True
 
     def unsubscribe_quotes(self, symbol):
+        symbol = self._parse_broker_symbol(symbol)
         data = self._request_and_wait(self.push_socket, 'UNSUB_QUOTES', symbol)
         return True
 
@@ -308,6 +317,7 @@ class MetaTrader():
 
     # trades
     def get_trades(self, symbol=''):
+        symbol = self._parse_broker_symbol(symbol)
         data = self._request_and_wait(self.push_socket, 'TRADES', symbol)
         return self._parse_orders(data)
 
@@ -367,6 +377,9 @@ class MetaTrader():
         return True
 
     ### helpers
+    def _parse_broker_symbol(self, symbol: str):
+        return symbol.replace("/", "")
+
     def _parse_data_by_keys(self, data, keys):
         raw = data.split('|')
         result = dict()

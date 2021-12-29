@@ -89,7 +89,10 @@ void MTMarkets::MTMarkets()
 //+------------------------------------------------------------------+
 bool MTMarkets::getMarkets(string &result)
   {
+
+#ifdef __MQL4__
    RefreshRates();
+#endif
 
    int total = SymbolsTotal(false);
    if(total == 0)
@@ -113,18 +116,36 @@ bool MTMarkets::getMarkets(string &result)
 void MTMarkets::parseMarket(string symbol, string &result)
   {
 // SYMBOL|SYMBOL_DESCRIPTION|SYMBOL_CURRENCY_BASE|MODE_POINT|MODE_DIGITS|MODE_MINLOT|MODE_LOTSTEP|MODE_MAXLOT|MODE_TICKSIZE|TIME_GMTOFFSET
-   StringAdd(result, StringFormat("%s|%s|%s|%g|%g|%g|%g|%g|%g|%g;",
-                                  symbol,
-                                  SymbolInfoString(symbol, SYMBOL_DESCRIPTION),
-                                  SymbolInfoString(symbol, SYMBOL_CURRENCY_BASE),
-                                  MarketInfo(symbol, MODE_POINT),
-                                  MarketInfo(symbol, MODE_DIGITS),
-                                  MarketInfo(symbol, MODE_MINLOT),
-                                  MarketInfo(symbol, MODE_LOTSTEP),
-                                  MarketInfo(symbol, MODE_MAXLOT),
-                                  MarketInfo(symbol, MODE_TICKSIZE),
-                                  TimeGMTOffset()
-                                 ));
+#ifdef __MQL4__
+   string market = StringFormat("%s|%s|%s|%g|%g|%g|%g|%g|%g|%g;",
+                                symbol,
+                                SymbolInfoString(symbol, SYMBOL_DESCRIPTION),
+                                SymbolInfoString(symbol, SYMBOL_CURRENCY_BASE),
+                                MarketInfo(symbol, MODE_POINT),
+                                MarketInfo(symbol, MODE_DIGITS),
+                                MarketInfo(symbol, MODE_MINLOT),
+                                MarketInfo(symbol, MODE_LOTSTEP),
+                                MarketInfo(symbol, MODE_MAXLOT),
+                                MarketInfo(symbol, MODE_TICKSIZE),
+                                TimeGMTOffset()
+                               );
+#endif
+#ifdef __MQL5__
+   string market = StringFormat("%s|%s|%s|%g|%g|%g|%g|%g|%g|%g;",
+                                symbol,
+                                SymbolInfoString(symbol, SYMBOL_DESCRIPTION),
+                                SymbolInfoString(symbol, SYMBOL_CURRENCY_BASE),
+                                SymbolInfoDouble(symbol, SYMBOL_POINT),
+                                SymbolInfoInteger(symbol, SYMBOL_DIGITS),
+                                SymbolInfoDouble(symbol, SYMBOL_VOLUME_MIN),
+                                SymbolInfoDouble(symbol, SYMBOL_VOLUME_STEP),
+                                SymbolInfoDouble(symbol, SYMBOL_VOLUME_MAX),
+                                SymbolInfoDouble(symbol, SYMBOL_TRADE_TICK_SIZE),
+                                TimeGMTOffset()
+                               );
+#endif
+
+   StringAdd(result, market);
 // bypass: error when get MarketInfo with symbol not in MarketWatch
    GetLastError();
   }
@@ -280,7 +301,9 @@ void MTMarkets::parseRate(MqlRates& rate, string &result)
 //+------------------------------------------------------------------+
 bool MTMarkets::getQuotes(string &result)
   {
+#ifdef __MQL4__
    RefreshRates();
+#endif
 
    int total = SymbolsTotal(true);
    if(total == 0)
@@ -344,7 +367,9 @@ void MTMarkets::clearQuoteSubscribers(void)
 //+------------------------------------------------------------------+
 bool MTMarkets::getLastQuotes(string &result)
   {
+#ifdef __MQL4__
    RefreshRates();
+#endif
 
    int size = ArraySize(this.symbols);
    for(int i = 0; i < size; i++)
@@ -364,11 +389,21 @@ bool MTMarkets::getLastQuotes(string &result)
 //+------------------------------------------------------------------+
 void MTMarkets::parseQuote(string symbol, string &result)
   {
+#ifdef __MQL4__
    double bid = MarketInfo(symbol, MODE_BID);
    double ask = MarketInfo(symbol, MODE_ASK);
-   double last = NormalizeDouble((bid + ask) / 2, Digits());
    double spread = MarketInfo(symbol, MODE_SPREAD);
+#endif
+#ifdef __MQL5__
+   MqlTick last_tick;
+   SymbolInfoTick(_Symbol, last_tick);
 
+   double bid = last_tick.bid;
+   double ask = last_tick.ask;
+   double spread = (double)SymbolInfoInteger(symbol, SYMBOL_SPREAD);
+#endif
+
+   double last = NormalizeDouble((bid + ask) / 2, Digits());
    double open = iOpen(symbol, PERIOD_D1, 0);
    double high = iHigh(symbol, PERIOD_D1, 0);
    double low = iLow(symbol, PERIOD_D1, 0);
