@@ -396,7 +396,7 @@ bool MTAccount::getPositions(string symbol,string &result)
    bool hasData = false;
    for(int i = 0; i < total; i++)
      {
-      if("" != PositionGetSymbol(i))
+      if("" == PositionGetSymbol(i))
          continue;
       if(StringLen(symbol) > 0 && PositionGetString(POSITION_SYMBOL) != symbol)
          continue;
@@ -419,27 +419,21 @@ bool MTAccount::getPositions(string symbol,string &result)
 //+------------------------------------------------------------------+
 bool MTAccount::parsePosition(string &result)
   {
-// TICKET|SYMBOL|TYPE|OPEN_PRICE|OPEN_TIME|LOT|SL|TP|PNL|COMMISSION|SWAP|EXPIRATION|COMMENT|CLOSE_PRICE|CLOSE_TIME
-
+// TICKET|SYMBOL|TYPE|OPEN_PRICE|OPEN_TIME|LOT|SL|TP|PNL|SWAP|COMMENT|CURRENT_PRICE
 #ifdef __MQL5__
-   string order = StringFormat("%d|%s|%s|%g|%f|%g|%g|%g|%g|%g|%g|%f|%s|%g|%f;",
-                               PositionGetInteger(POSITION_TICKET),
-                               PositionGetString(POSITION_SYMBOL),
-                               OperationTypeToString(PositionGetInteger(POSITION_TYPE)),
-                               PositionGetDouble(POSITION_PRICE_OPEN),
-                               PositionGetInteger(POSITION_TIME),
-                               PositionGetDouble(POSITION_VOLUME),
-                               PositionGetDouble(POSITION_SL),
-                               PositionGetDouble(POSITION_TP),
-                               PositionGetDouble(POSITION_PROFIT),
-                               0.0,
-                               PositionGetDouble(POSITION_SWAP),
-                               0,
-                               PositionGetString(POSITION_COMMENT),
-                               PositionGetDouble(POSITION_PRICE_CURRENT),
-                               0.0
-                              );
+   StringAdd(result, StringFormat("ticket=%d", PositionGetInteger(POSITION_TICKET)));
+   StringAdd(result, StringFormat("|symbol=%s", PositionGetString(POSITION_SYMBOL)));
+   StringAdd(result, StringFormat("|type=%s", OperationTypeToString(PositionGetInteger(POSITION_TYPE))));
+   StringAdd(result, StringFormat("|open_price=%g", PositionGetDouble(POSITION_PRICE_OPEN)));
+   StringAdd(result, StringFormat("|open_time=%f", PositionGetInteger(POSITION_TIME)));
+   StringAdd(result, StringFormat("|lots=%g", PositionGetDouble(POSITION_VOLUME)));
+   StringAdd(result, StringFormat("|sl=%g", PositionGetDouble(POSITION_SL)));
+   StringAdd(result, StringFormat("|tp=%g", PositionGetDouble(POSITION_TP)));
+   StringAdd(result, StringFormat("|pnl=%g", PositionGetDouble(POSITION_PROFIT)));
+   StringAdd(result, StringFormat("|swap=%g", PositionGetDouble(POSITION_SWAP)));
+   StringAdd(result, StringFormat("|comment=%s", PositionGetString(POSITION_COMMENT)));
+   StringAdd(result, StringFormat("|current_price=%f", PositionGetDouble(POSITION_PRICE_CURRENT)));
 #endif
-   return StringAdd(result, order);
+   return StringAdd(result, ";");
   }
 //+------------------------------------------------------------------+

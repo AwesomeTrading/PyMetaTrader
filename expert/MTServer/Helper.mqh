@@ -19,8 +19,10 @@ int StringToOperationType(string type)
 #endif
 #ifdef __MQL5__
    if(type == "BUY_MARKET")
+      // Can using for position because ORDER_TYPE_BUY == POSITION_TYPE_BUY
       return ORDER_TYPE_BUY;
    if(type == "SELL_MARKET")
+      // Can using for position because ORDER_TYPE_SELL == POSITION_TYPE_SELL
       return ORDER_TYPE_SELL;
    if(type == "BUY_LIMIT")
       return ORDER_TYPE_BUY_LIMIT;
@@ -55,8 +57,10 @@ string OperationTypeToString(long type)
       return "SELL_STOP";
 #endif
 #ifdef __MQL5__
+// Can using for position because ORDER_TYPE_BUY == POSITION_TYPE_BUY
    if(type == ORDER_TYPE_BUY)
       return "BUY_MARKET";
+// Can using for position because ORDER_TYPE_SELL == POSITION_TYPE_SELL
    if(type == ORDER_TYPE_SELL)
       return "SELL_MARKET";
    if(type == ORDER_TYPE_BUY_LIMIT)

@@ -329,7 +329,37 @@ class MetaTrader():
     def get_trades(self, symbol=''):
         symbol = self._parse_broker_symbol(symbol)
         data = self._request_and_wait(self.push_socket, 'TRADES', symbol)
-        return self._parse_orders(data)
+        return self._parse_trades(data)
+
+    def _parse_trades(self, data):
+        raws = data.split(';')
+        trades = []
+        for raw in raws:
+            if not raw:
+                continue
+
+            trade = self._parse_trade(raw)
+            trades.append(trade)
+        return trades
+
+    _trade_format = dict(
+        ticket=int,
+        open_price=float,
+        open_time=float,
+        lots=float,
+        sl=float,
+        tp=float,
+        pnl=float,
+        swap=float,
+        current_price=float,
+    )
+
+    def _parse_trade(self, raw):
+        trade = self._parse_data_dict(raw, self._trade_format)
+        trade['symbol'] = self._parse_api_symbol(trade['symbol'])
+        trade['open_time'] = trade['open_time'] * 1000
+        trade['current_price'] = trade['current_price'] * 1000
+        return trade
 
     # orders
     def get_open_orders(self):
@@ -409,4 +439,17 @@ class MetaTrader():
                 raise RuntimeError(
                     f"Cannot parse data {data} by key {key}, type {type} and value {raw[i]}"
                 )
+        return result
+
+    def _parse_data_dict(self, data, format):
+        raws = data.split('|')
+        result = dict()
+        for raw in raws:
+            key, val = raw.split("=", 1)
+            type = format.get("key", str)
+            try:
+                result[key] = type(val)
+            except:
+                raise RuntimeError(f"Cannot parse value {val} by key {key}, "
+                                   f"type {type} for data {data}")
         return result
