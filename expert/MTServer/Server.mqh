@@ -100,8 +100,9 @@ private:
    void              throwOrderEvent(ENUM_EVENTS event, ulong ticket);
 
    void              processRequestTrades(string &params[]);
+   void              processRequestModifyTrade(string &params[]);
    void              processRequestCloseTrade(string &params[]);
-   void              throwTradeEvent(ENUM_EVENTS event, ulong ticket);
+   void              throwTradeEvent(ENUM_EVENTS event, ulong ticket, string trade);
 
 public:
                      MTServer(ulong magic, int deviation);
@@ -109,6 +110,7 @@ public:
    bool              stop();
    void              onTick();
    void              onTimer();
+   void              onTrade();
   };
 
 //+------------------------------------------------------------------+
@@ -176,6 +178,28 @@ void MTServer::onTick(void)
 void MTServer::onTimer(void)
   {
    this.checkRequest();
+  }
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+void MTServer::onTrade(void)
+  {
+// History
+   string historyOrders = StringFormat("ORDERS %s|", EventToString(EVENT_COMPLETED));
+   string historyDeals = StringFormat("DEALS %s|", EventToString(EVENT_COMPLETED));
+   this.account.checkHistory(historyOrders, historyDeals);
+   this.reply(pubSocket, historyOrders);
+   this.reply(pubSocket, historyDeals);
+
+// Open orders
+   string orders = StringFormat("ORDERS %s|", EventToString(EVENT_MODIFIED));
+   this.account.getOrders(orders);
+   this.reply(pubSocket, orders);
+
+// Trades
+   string trades = StringFormat("TRADES %s|", EventToString(EVENT_MODIFIED));
+   this.account.getTrades(trades);
+   this.reply(pubSocket, trades);
   }
 //+------------------------------------------------------------------+
 //|                                                                  |
@@ -451,7 +475,11 @@ void MTServer::processRequest(string &params[])
       this.processRequestTrades(params);
       return;
      }
-
+   if(action == "MODIFY_TRADE")
+     {
+      this.processRequestModifyTrade(params);
+      return;
+     }
    if(action == "CLOSE_TRADE")
      {
       this.processRequestCloseTrade(params);
@@ -599,9 +627,33 @@ void MTServer::processRequestTrades(string &params[])
   {
    string symbol = params[2];
    string result = "";
-   this.account.getTrades(symbol, result);
+   this.account.getTrades(result, symbol);
    this.requestReply(params[1], result);
   }
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+void MTServer::processRequestModifyTrade(string &params[])
+  {
+#ifdef __MQL4__
+   ulong ticket = StrToInteger(params[2]);
+#endif
+#ifdef __MQL5__
+   ulong ticket = StringToInteger(params[2]);
+#endif
+   double sl = StringToDouble(params[3]);
+   double tp = StringToDouble(params[4]);
+
+// process
+   string result = "";
+   bool ok = this.account.modifyTrade(ticket, sl, tp, result);
+   this.requestReply(params[1], result);
+
+// event MODIFY ORDER
+   if(ok)
+      this.throwTradeEvent(EVENT_MODIFIED, ticket);
+  }
+
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
@@ -613,25 +665,25 @@ void MTServer::processRequestCloseTrade(string &params[])
 #ifdef __MQL5__
    ulong ticket = StringToInteger(params[2]);
 #endif
+   string trade = "";
+   this.account.getTrade(ticket, trade);
 
    string result = "";
    bool ok = this.account.closeTrade(ticket, result);
    this.requestReply(params[1], result);
 
 // event COMPLETED TRADE
-   this.throwTradeEvent(EVENT_COMPLETED, ticket);
+   if(ok)
+      this.throwTradeEvent(EVENT_COMPLETED, ticket, trade);
   }
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-void MTServer::throwTradeEvent(ENUM_EVENTS event, ulong ticket)
+void MTServer::throwTradeEvent(ENUM_EVENTS event, ulong ticket, string trade = "")
   {
-   string trade = "";
    switch(event)
      {
-      case EVENT_CANCELED:
       case EVENT_COMPLETED:
-         this.account.getHistoryOrder(ticket, trade);
          break;
       default:
          this.account.getTrade(ticket, trade);
@@ -648,10 +700,8 @@ void MTServer::throwTradeEvent(ENUM_EVENTS event, ulong ticket)
 void MTServer::processRequestOrders(string &params[])
   {
    string symbol = params[2];
-   int modes[] = {};
-
    string result = "";
-   this.account.getOrders(symbol, modes, result);
+   this.account.getOrders(result, symbol);
    this.requestReply(params[1], result);
   }
 
@@ -675,15 +725,12 @@ void MTServer::processRequestOpenOrder(string &params[])
    this.requestReply(params[1], result);
 
 // Throw event
-// Market order return trade ticket
-   if(type == ORDER_TYPE_BUY || type == ORDER_TYPE_SELL)
-     {
-      this.throwTradeEvent(EVENT_OPENED, ticket);
-     }
-   else
-     {
-      this.throwOrderEvent(EVENT_OPENED, ticket);
-     }
+   if(ticket > 0)
+      // Market order return trade ticket
+      if(type == ORDER_TYPE_BUY || type == ORDER_TYPE_SELL)
+         this.throwTradeEvent(EVENT_OPENED, ticket);
+      else
+         this.throwOrderEvent(EVENT_OPENED, ticket);
   }
 
 //+------------------------------------------------------------------+
@@ -709,9 +756,9 @@ void MTServer::processRequestModifyOrder(string &params[])
    this.requestReply(params[1], result);
 
 // event MODIFY ORDER
-   this.throwOrderEvent(EVENT_MODIFIED, ticket);
+   if(ok)
+      this.throwOrderEvent(EVENT_MODIFIED, ticket);
   }
-
 
 //+------------------------------------------------------------------+
 //|                                                                  |
@@ -726,11 +773,12 @@ void MTServer::processRequestCancelOrder(string &params[])
 #endif
 
    string result = "";
-   this.account.cancelOrder(ticket, result);
+   bool ok = this.account.cancelOrder(ticket, result);
    this.requestReply(params[1], result);
 
 // event CANCEL ORDER
-   this.throwOrderEvent(EVENT_CANCELED, ticket);
+   if(ok)
+      this.throwOrderEvent(EVENT_CANCELED, ticket);
   }
 
 //+------------------------------------------------------------------+

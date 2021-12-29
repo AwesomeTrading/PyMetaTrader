@@ -49,6 +49,7 @@ class MetaTrader():
         self.sub_socket.setsockopt_string(zmq.SUBSCRIBE, "BARS")
         self.sub_socket.setsockopt_string(zmq.SUBSCRIBE, "QUOTES")
         self.sub_socket.setsockopt_string(zmq.SUBSCRIBE, "ORDERS")
+        self.sub_socket.setsockopt_string(zmq.SUBSCRIBE, "TRADES")
 
         # Bind PUSH Socket to send commands to MetaTrader
         self.push_socket.connect(self.url + str(self.push_port))
@@ -130,7 +131,7 @@ class MetaTrader():
                     if not msg:
                         continue
 
-                    # print("msg ", msg)
+                    # print("---> msg ", msg)
                     # sub socket
                     if socket == self.sub_socket:
                         type, data = msg.split(" ", 1)
@@ -340,6 +341,11 @@ class MetaTrader():
         symbol = self._parse_broker_symbol(symbol)
         data = self._request_and_wait(self.push_socket, 'TRADES', symbol)
         return self._parse_trades(data)
+
+    def modify_trade(self, ticket, sl=0, tp=0):
+        request = f"{ticket};{sl};{tp}"
+        self._request_and_wait(self.push_socket, 'MODIFY_TRADE', request)
+        return True
 
     def close_trade(self, ticket):
         self._request_and_wait(self.push_socket, 'CLOSE_TRADE', ticket)

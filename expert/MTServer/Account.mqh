@@ -22,30 +22,30 @@ private:
 #ifdef __MQL5__
    CTrade            trade;
 #endif
-   datetime          orderEventCheckTime;
-
-   bool              parseOrder(string &result);
+   datetime          historyCheckTime;
 
 public:
    void              MTAccount(ulong magic, int deviation);
    bool              getFund(string &result);
    // Order
-   bool              getOrders(string symbol, int &modes[], string &result);
+   bool              getOrders(string &result, string symbol);
    bool              getOrder(ulong ticket, string &result);
    ulong             openOrder(string symbol, int type, double lots, double price, double sl, double tp, string comment, string &result);
    bool              modifyOrder(ulong ticket, double price, double sl, double tp, datetime expiration, string &result);
    bool              cancelOrder(ulong ticket, string &result);
+   bool              parseOrder(string &result, bool suffix);
 
    // History order
    bool              getHistoryOrder(ulong ticket, string &result);
-   bool              parseHistoryOrder(ulong ticket, string &result);
-   int               checkHistoryOrders(string &result);
+   bool              parseHistoryOrder(ulong ticket, string &result, bool suffix);
+   bool              checkHistory(string &orders, string &deals);
 
    // Trade
-   bool              getTrades(string symbol, string &result);
+   bool              getTrades(string &result, string symbol);
    bool              getTrade(ulong ticket, string &result);
+   bool              modifyTrade(ulong ticket, double sl, double tp, string &result);
    bool              closeTrade(ulong ticket, string &result);
-   bool              parseTrade(string &result);
+   bool              parseTrade(string &result, bool suffix);
   };
 
 //+------------------------------------------------------------------+
@@ -62,7 +62,7 @@ void MTAccount::MTAccount(ulong magic, int deviation)
    this.trade.SetDeviationInPoints(deviation);
 #endif
 
-   this.orderEventCheckTime = TimeCurrent();
+   this.historyCheckTime = TimeCurrent();
   }
 //+------------------------------------------------------------------+
 //|                                                                  |
@@ -82,22 +82,20 @@ bool MTAccount::getFund(string &result)
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-bool MTAccount::getOrders(string symbol, int &modes[], string &result)
+bool MTAccount::getOrders(string &result, string symbol="")
   {
    int total = OrdersTotal();
    if(total == 0)
       return true;
 
 // loop
-   bool hasData = false;
-   for(int i = 0; i < total; i++)
+   for(int i = total - 1; i >=0 ; i--)
      {
+
 #ifdef __MQL4__
       if(!OrderSelect(i, SELECT_BY_POS, MODE_TRADES))
          continue;
       if(StringLen(symbol) > 0 && OrderSymbol() != symbol)
-         continue;
-      if(ArraySize(modes) > 0 && !ArrayExist(modes, OrderType()))
          continue;
 #endif
 #ifdef __MQL5__
@@ -105,17 +103,9 @@ bool MTAccount::getOrders(string symbol, int &modes[], string &result)
          continue;
       if(StringLen(symbol) > 0 && OrderGetString(ORDER_SYMBOL) != symbol)
          continue;
-      if(ArraySize(modes) > 0 && !ArrayExist(modes, (int)OrderGetInteger(ORDER_TYPE)))
-         continue;
 #endif
 
-      this.parseOrder(result);
-      hasData = true;
-     }
-
-   if(hasData)
-     {
-      result = StringSubstr(result, 0, StringLen(result)-1);
+      this.parseOrder(result, i > 0);
      }
    return true;
   }
@@ -135,13 +125,12 @@ bool MTAccount::getOrder(ulong ticket, string &result)
 #endif
 
    this.parseOrder(result);
-   result = StringSubstr(result, 0, StringLen(result)-1);
    return true;
   }
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-bool MTAccount::parseOrder(string &result)
+bool MTAccount::parseOrder(string &result, bool suffix=false)
   {
 // TICKET|SYMBOL|TYPE|OPEN_PRICE|OPEN_TIME|LOT|SL|TP|PNL|COMMISSION|SWAP|EXPIRATION|COMMENT|CLOSE_PRICE|CLOSE_TIME
 #ifdef __MQL4__
@@ -185,56 +174,11 @@ bool MTAccount::parseOrder(string &result)
    StringAdd(result, StringFormat("|comment=%s", comment));
    StringAdd(result, StringFormat("|close_price=%g", closePrice));
    StringAdd(result, StringFormat("|close_time=%f", closeTime));
-   return StringAdd(result, ";");
+   if(suffix)
+      StringAdd(result, ";");
+   return true;
   }
 
-//+------------------------------------------------------------------+
-//|                                                                  |
-//+------------------------------------------------------------------+
-/*
-int MTAccount::checkHistoryOrders(string &result)
-  {
-#ifdef __MQL4__
-   int total = OrdersHistoryTotal();
-#endif
-#ifdef __MQL5__
-   int total = HistoryOrdersTotal();
-#endif
-
-   int size = 0;
-   for(int i = total - 1; i >= 0; i--)
-     {
-
-#ifdef __MQL4__
-      if(!OrderSelect(i, SELECT_BY_POS, MODE_HISTORY))
-         break;
-      if(OrderCloseTime() != 0 && OrderCloseTime() < this.orderEventCheckTime)
-         break;
-      if(OrderOpenTime() < this.orderEventCheckTime)
-         break;
-#endif
-#ifdef __MQL5__
-      ulong ticket = HistoryDealGetTicket(i);
-      if(ticket <= 0)
-         break;
-      if(HistoryOrderGetInteger(ticket, ORDER_TIME_DONE) != 0 && HistoryOrderGetInteger(ticket, ORDER_TIME_DONE) < this.orderEventCheckTime)
-         break;
-      if(HistoryOrderGetInteger(ticket, ORDER_TIME_SETUP) < this.orderEventCheckTime)
-         break;
-#endif
-
-      size++;
-      this.parseOrder(result);
-     }
-   this.orderEventCheckTime = TimeCurrent();
-
-   if(size > 0)
-     {
-      result = StringSubstr(result, 0, StringLen(result)-1);
-     }
-   return size;
-  }
-*/
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
@@ -299,6 +243,50 @@ bool MTAccount::cancelOrder(ulong ticket, string &result)
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
+bool MTAccount::checkHistory(string &orders, string &deals)
+  {
+#ifdef __MQL4__
+   int total = OrdersHistoryTotal();
+   int size = 0;
+   for(int i = total - 1; i >= 0; i--)
+     {
+      if(!OrderSelect(i, SELECT_BY_POS, MODE_HISTORY))
+         break;
+      if(OrderCloseTime() != 0 && OrderCloseTime() < this.historyCheckTime)
+         break;
+      if(OrderOpenTime() < this.historyCheckTime)
+         break;
+
+      size++;
+      this.parseOrder(orders, i > 0);
+     }
+#endif
+#ifdef __MQL5__
+   if(!HistorySelect(this.historyCheckTime, TimeCurrent()))
+      return false;
+
+// Orders
+   int total = HistoryOrdersTotal();
+   for(int i = total - 1; i >= 0; i--)
+     {
+      ulong ticket = HistoryOrderGetTicket(i);
+      if(ticket <= 0)
+         break;
+      if(HistoryOrderGetInteger(ticket, ORDER_TIME_DONE) != 0 && HistoryOrderGetInteger(ticket, ORDER_TIME_DONE) < this.historyCheckTime)
+         break;
+      if(HistoryOrderGetInteger(ticket, ORDER_TIME_SETUP) < this.historyCheckTime)
+         break;
+      this.parseHistoryOrder(ticket, orders, i > 0);
+     }
+#endif
+
+   this.historyCheckTime = TimeCurrent();
+   return true;
+  }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
 bool MTAccount::getHistoryOrder(ulong ticket, string &result)
   {
 #ifdef __MQL4__
@@ -310,14 +298,12 @@ bool MTAccount::getHistoryOrder(ulong ticket, string &result)
       return false;
 #endif
 
-   this.parseHistoryOrder(ticket, result);
-   result = StringSubstr(result, 0, StringLen(result)-1);
-   return true;
+   return this.parseHistoryOrder(ticket, result);
   }
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-bool MTAccount::parseHistoryOrder(ulong ticket, string &result)
+bool MTAccount::parseHistoryOrder(ulong ticket, string &result, bool suffix = false)
   {
 #ifdef __MQL4__
    string symbol = OrderSymbol();
@@ -358,7 +344,9 @@ bool MTAccount::parseHistoryOrder(ulong ticket, string &result)
    StringAdd(result, StringFormat("|comment=%s", comment));
    StringAdd(result, StringFormat("|close_price=%g", closePrice));
    StringAdd(result, StringFormat("|close_time=%f", closeTime));
-   return StringAdd(result, ";");
+   if(suffix)
+      StringAdd(result, ";");
+   return true;
   }
 
 //+------------------------------------------------------------------+
@@ -381,7 +369,7 @@ bool MTAccount::closePartialTrade(ulong ticket, double lots, double price, strin
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-bool MTAccount::getTrades(string symbol,string &result)
+bool MTAccount::getTrades(string &result, string symbol="")
   {
 #ifdef __MQL4__
    int modes[] = {OP_BUY, OP_SELL};
@@ -393,22 +381,16 @@ bool MTAccount::getTrades(string symbol,string &result)
       return true;
 
 // loop
-   bool hasData = false;
-   for(int i = 0; i < total; i++)
+   for(int i = total - 1; i >= 0; i--)
      {
-      if("" == PositionGetSymbol(i))
+      if(PositionGetTicket(i) <= 0)
          continue;
       if(StringLen(symbol) > 0 && PositionGetString(POSITION_SYMBOL) != symbol)
          continue;
 
-      this.parseTrade(result);
-      hasData = true;
+      this.parseTrade(result, i > 0);
      }
 
-   if(hasData)
-     {
-      result = StringSubstr(result, 0, StringLen(result)-1);
-     }
    return true;
 #endif
 
@@ -428,9 +410,22 @@ bool MTAccount::getTrade(ulong ticket, string &result)
       return false;
 #endif
 
-   this.parseTrade(result);
-   result = StringSubstr(result, 0, StringLen(result)-1);
-   return true;
+   return this.parseTrade(result);
+  }
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+bool MTAccount::modifyTrade(ulong ticket, double sl, double tp, string &result)
+  {
+   sl = NormalizeDouble(sl, Digits());
+   tp = NormalizeDouble(tp, Digits());
+
+#ifdef __MQL4__
+
+#endif
+#ifdef __MQL5__
+   return this.trade.PositionModify(ticket, sl, tp);
+#endif
   }
 
 //+------------------------------------------------------------------+
@@ -454,7 +449,7 @@ bool MTAccount::closeTrade(ulong ticket, string &result)
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-bool MTAccount::parseTrade(string &result)
+bool MTAccount::parseTrade(string &result, bool suffix=false)
   {
 #ifdef __MQL5__
    StringAdd(result, StringFormat("ticket=%d", PositionGetInteger(POSITION_TICKET)));
@@ -470,6 +465,8 @@ bool MTAccount::parseTrade(string &result)
    StringAdd(result, StringFormat("|comment=%s", PositionGetString(POSITION_COMMENT)));
    StringAdd(result, StringFormat("|current_price=%f", PositionGetDouble(POSITION_PRICE_CURRENT)));
 #endif
-   return StringAdd(result, ";");
+   if(suffix)
+      StringAdd(result, ";");
+   return true;
   }
 //+------------------------------------------------------------------+
