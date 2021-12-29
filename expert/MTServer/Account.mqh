@@ -9,35 +9,6 @@
 #include <Trade\Trade.mqh>
 #endif
 
-enum ENUM_ORDER_EVENTS
-  {
-   EVENT_ORDER_OPENED,
-   EVENT_ORDER_MODIFIED,
-   EVENT_ORDER_COMPLETED,
-   EVENT_ORDER_CANCELED,
-   EVENT_ORDER_EXPIRED,
-  };
-//+------------------------------------------------------------------+
-//|                                                                  |
-//+------------------------------------------------------------------+
-string OrderEventToString(ENUM_ORDER_EVENTS event)
-  {
-   switch(event)
-     {
-      case EVENT_ORDER_OPENED:
-         return "ORDER_OPENED";
-      case EVENT_ORDER_MODIFIED:
-         return "ORDER_MODIFIED";
-      case EVENT_ORDER_COMPLETED:
-         return "ORDER_COMPLETED";
-      case EVENT_ORDER_CANCELED:
-         return "ORDER_CANCELED";
-      case EVENT_ORDER_EXPIRED:
-         return "ORDER_EXPIRED";
-      default:
-         return "UNKNOWN";
-     }
-  }
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
@@ -60,20 +31,21 @@ public:
    bool              getFund(string &result);
    // Order
    bool              getOrders(string symbol, int &modes[], string &result);
-   bool              getOrderByTicket(ulong ticket, string &result);
+   bool              getOrder(ulong ticket, string &result);
    ulong             openOrder(string symbol, int type, double lots, double price, double sl, double tp, string comment, string &result);
    bool              modifyOrder(ulong ticket, double price, double sl, double tp, datetime expiration, string &result);
-   bool              closePartialOrder(ulong ticket, double lots, double price, string &result);
-   bool              closeOrder(ulong ticket, string &result);
    bool              cancelOrder(ulong ticket, string &result);
 
-   int               getNewOrdersEvents(string &result);
-   bool              getOrderEventByTicket(ulong ticket, ENUM_ORDER_EVENTS event, string &result);
-   bool              parseSelectedOrderEvent(ENUM_ORDER_EVENTS event, string &result);
+   // History order
+   bool              getHistoryOrder(ulong ticket, string &result);
+   bool              parseHistoryOrder(ulong ticket, string &result);
+   int               checkHistoryOrders(string &result);
 
-   // Position
-   bool              getPositions(string symbol, string &result);
-   bool              parsePosition(string &result);
+   // Trade
+   bool              getTrades(string symbol, string &result);
+   bool              getTrade(ulong ticket, string &result);
+   bool              closeTrade(ulong ticket, string &result);
+   bool              parseTrade(string &result);
   };
 
 //+------------------------------------------------------------------+
@@ -151,7 +123,7 @@ bool MTAccount::getOrders(string symbol, int &modes[], string &result)
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-bool MTAccount::getOrderByTicket(ulong ticket, string &result)
+bool MTAccount::getOrder(ulong ticket, string &result)
   {
 #ifdef __MQL4__
    if(!OrderSelect(ticket, SELECT_BY_TICKET, MODE_TRADES))
@@ -173,50 +145,54 @@ bool MTAccount::parseOrder(string &result)
   {
 // TICKET|SYMBOL|TYPE|OPEN_PRICE|OPEN_TIME|LOT|SL|TP|PNL|COMMISSION|SWAP|EXPIRATION|COMMENT|CLOSE_PRICE|CLOSE_TIME
 #ifdef __MQL4__
-   string order = StringFormat("%d|%s|%s|%g|%f|%g|%g|%g|%g|%g|%g|%f|%s|%g|%f;",
-                               OrderTicket(),
-                               OrderSymbol(),
-                               OperationTypeToString(OrderType()),
-                               OrderOpenPrice(),
-                               OrderOpenTime(),
-                               OrderLots(),
-                               OrderStopLoss(),
-                               OrderTakeProfit(),
-                               OrderProfit(),
-                               OrderCommission(),
-                               OrderSwap(),
-                               OrderExpiration(),
-                               OrderComment(),
-                               OrderClosePrice(),
-                               OrderCloseTime()
-                              );
+   ulong ticket = OrderTicket();
+   string symbol = OrderSymbol();
+   string type = OperationTypeToString(OrderType());
+   double openPrice = OrderOpenPrice();
+   long openTime = OrderOpenTime();
+   double lots = OrderLots();
+   double sl = OrderStopLoss();
+   double tp = OrderTakeProfit();
+   double closePrice = OrderClosePrice();
+   double closeTime= OrderCloseTime();
+   long expiration= OrderExpiration();
+   string comment= OrderComment();
 #endif
 #ifdef __MQL5__
-   string order = StringFormat("%d|%s|%s|%g|%f|%g|%g|%g|%g|%g|%g|%f|%s|%g|%f;",
-                               OrderGetInteger(ORDER_TICKET),
-                               OrderGetString(ORDER_SYMBOL),
-                               OperationTypeToString(OrderGetInteger(ORDER_TYPE)),
-                               OrderGetDouble(ORDER_PRICE_OPEN),
-                               OrderGetInteger(ORDER_TYPE_TIME),
-                               OrderGetDouble(ORDER_VOLUME_INITIAL),
-                               OrderGetDouble(ORDER_SL),
-                               OrderGetDouble(ORDER_TP),
-                               0.0,
-                               0.0,
-                               0.0,
-                               OrderGetInteger(ORDER_TIME_EXPIRATION),
-                               OrderGetString(ORDER_COMMENT),
-                               OrderGetDouble(ORDER_PRICE_CURRENT),
-                               0.0
-                              );
+   ulong ticket = OrderGetInteger(ORDER_TICKET);
+   string symbol = OrderGetString(ORDER_SYMBOL);
+   string type = OperationTypeToString(OrderGetInteger(ORDER_TYPE));
+   double openPrice = OrderGetDouble(ORDER_PRICE_OPEN);
+   long openTime = OrderGetInteger(ORDER_TIME_SETUP);
+   double lots = OrderGetDouble(ORDER_VOLUME_INITIAL);
+   double sl = OrderGetDouble(ORDER_SL);
+   double tp = OrderGetDouble(ORDER_TP);
+   long expiration= OrderGetInteger(ORDER_TIME_EXPIRATION);
+   string comment= OrderGetString(ORDER_COMMENT);
+   double closePrice = 0;
+   long closeTime= 0;
 #endif
-   return StringAdd(result, order);
+
+   StringAdd(result, StringFormat("ticket=%d", ticket));
+   StringAdd(result, StringFormat("|symbol=%s", symbol));
+   StringAdd(result, StringFormat("|type=%s", type));
+   StringAdd(result, StringFormat("|open_price=%g", openPrice));
+   StringAdd(result, StringFormat("|open_time=%f", openTime));
+   StringAdd(result, StringFormat("|lots=%g", lots));
+   StringAdd(result, StringFormat("|sl=%g", sl));
+   StringAdd(result, StringFormat("|tp=%g", tp));
+   StringAdd(result, StringFormat("|expiration=%f", expiration));
+   StringAdd(result, StringFormat("|comment=%s", comment));
+   StringAdd(result, StringFormat("|close_price=%g", closePrice));
+   StringAdd(result, StringFormat("|close_time=%f", closeTime));
+   return StringAdd(result, ";");
   }
 
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-int MTAccount::getNewOrdersEvents(string &result)
+/*
+int MTAccount::checkHistoryOrders(string &result)
   {
 #ifdef __MQL4__
    int total = OrdersHistoryTotal();
@@ -228,6 +204,7 @@ int MTAccount::getNewOrdersEvents(string &result)
    int size = 0;
    for(int i = total - 1; i >= 0; i--)
      {
+
 #ifdef __MQL4__
       if(!OrderSelect(i, SELECT_BY_POS, MODE_HISTORY))
          break;
@@ -237,11 +214,12 @@ int MTAccount::getNewOrdersEvents(string &result)
          break;
 #endif
 #ifdef __MQL5__
-      if(!HistoryOrderSelect(i))
+      ulong ticket = HistoryDealGetTicket(i);
+      if(ticket <= 0)
          break;
-      if(OrderGetInteger(ORDER_TIME_DONE) != 0 && OrderGetInteger(ORDER_TIME_DONE) < this.orderEventCheckTime)
+      if(HistoryOrderGetInteger(ticket, ORDER_TIME_DONE) != 0 && HistoryOrderGetInteger(ticket, ORDER_TIME_DONE) < this.orderEventCheckTime)
          break;
-      if(OrderGetInteger(ORDER_TIME_SETUP) < this.orderEventCheckTime)
+      if(HistoryOrderGetInteger(ticket, ORDER_TIME_SETUP) < this.orderEventCheckTime)
          break;
 #endif
 
@@ -256,33 +234,7 @@ int MTAccount::getNewOrdersEvents(string &result)
      }
    return size;
   }
-
-//+------------------------------------------------------------------+
-//|                                                                  |
-//+------------------------------------------------------------------+
-bool MTAccount::getOrderEventByTicket(ulong ticket, ENUM_ORDER_EVENTS event, string &result)
-  {
-#ifdef __MQL4__
-   if(!OrderSelect(ticket, SELECT_BY_TICKET, MODE_TRADES))
-      return false;
-#endif
-#ifdef __MQL5__
-   if(!OrderSelect(ticket))
-      return false;
-#endif
-   return this.parseSelectedOrderEvent(event, result);
-  }
-
-//+------------------------------------------------------------------+
-//|                                                                  |
-//+------------------------------------------------------------------+
-bool MTAccount::parseSelectedOrderEvent(ENUM_ORDER_EVENTS event, string &result)
-  {
-   StringAdd(result, StringFormat("%s|", OrderEventToString(event)));
-   this.parseOrder(result);
-   result = StringSubstr(result, 0, StringLen(result)-1);
-   return true;
-  }
+*/
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
@@ -334,7 +286,86 @@ bool MTAccount::modifyOrder(ulong ticket, double price, double sl, double tp, da
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-bool MTAccount::closePartialOrder(ulong ticket, double lots, double price, string &result)
+bool MTAccount::cancelOrder(ulong ticket, string &result)
+  {
+#ifdef __MQL4__
+   return OrderDelete(ticket);
+#endif
+#ifdef __MQL5__
+   return this.trade.OrderDelete(ticket);
+#endif
+  }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+bool MTAccount::getHistoryOrder(ulong ticket, string &result)
+  {
+#ifdef __MQL4__
+   if(!OrderSelect(ticket, SELECT_BY_TICKET, MODE_TRADES))
+      return false;
+#endif
+#ifdef __MQL5__
+   if(!HistoryOrderSelect(ticket))
+      return false;
+#endif
+
+   this.parseHistoryOrder(ticket, result);
+   result = StringSubstr(result, 0, StringLen(result)-1);
+   return true;
+  }
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+bool MTAccount::parseHistoryOrder(ulong ticket, string &result)
+  {
+#ifdef __MQL4__
+   string symbol = OrderSymbol();
+   string type = OperationTypeToString(OrderType());
+   double openPrice = OrderOpenPrice();
+   long openTime = OrderOpenTime();
+   double lots = OrderLots();
+   double sl = OrderStopLoss();
+   double tp = OrderTakeProfit();
+   double closePrice = OrderClosePrice();
+   double closeTime= OrderCloseTime();
+   long expiration= OrderExpiration();
+   string comment= OrderComment();
+#endif
+#ifdef __MQL5__
+   string symbol = HistoryOrderGetString(ticket, ORDER_SYMBOL);
+   string type = OperationTypeToString(HistoryOrderGetInteger(ticket, ORDER_TYPE));
+   double openPrice = HistoryOrderGetDouble(ticket, ORDER_PRICE_OPEN);
+   long openTime = HistoryOrderGetInteger(ticket, ORDER_TIME_SETUP);
+   double lots = HistoryOrderGetDouble(ticket, ORDER_VOLUME_INITIAL);
+   double sl = HistoryOrderGetDouble(ticket, ORDER_SL);
+   double tp = HistoryOrderGetDouble(ticket, ORDER_TP);
+   long expiration= HistoryOrderGetInteger(ticket, ORDER_TIME_EXPIRATION);
+   string comment= HistoryOrderGetString(ticket, ORDER_COMMENT);
+   double closePrice = 0;
+   long closeTime= 0;
+#endif
+
+   StringAdd(result, StringFormat("ticket=%d", ticket));
+   StringAdd(result, StringFormat("|symbol=%s", symbol));
+   StringAdd(result, StringFormat("|type=%s", type));
+   StringAdd(result, StringFormat("|open_price=%g", openPrice));
+   StringAdd(result, StringFormat("|open_time=%f", openTime));
+   StringAdd(result, StringFormat("|lots=%g", lots));
+   StringAdd(result, StringFormat("|sl=%g", sl));
+   StringAdd(result, StringFormat("|tp=%g", tp));
+   StringAdd(result, StringFormat("|expiration=%f", expiration));
+   StringAdd(result, StringFormat("|comment=%s", comment));
+   StringAdd(result, StringFormat("|close_price=%g", closePrice));
+   StringAdd(result, StringFormat("|close_time=%f", closeTime));
+   return StringAdd(result, ";");
+  }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+/*
+bool MTAccount::closePartialTrade(ulong ticket, double lots, double price, string &result)
   {
    price = NormalizeDouble(price, Digits());
 
@@ -345,43 +376,12 @@ bool MTAccount::closePartialOrder(ulong ticket, double lots, double price, strin
    return this.trade.PositionClosePartial(ticket, lots);
 #endif
   }
+*/
 
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-bool MTAccount::closeOrder(ulong ticket, string &result)
-  {
-#ifdef __MQL4__
-   if(!OrderSelect(ticket, SELECT_BY_TICKET))
-      return false;
-   RefreshRates();
-
-   return this.closePartialOrder(ticket, OrderLots(), OrderClosePrice(), result);
-#endif
-#ifdef __MQL5__
-   if(!OrderSelect(ticket))
-      return false;
-
-   return this.trade.PositionClose(ticket);
-#endif
-  }
-
-//+------------------------------------------------------------------+
-//|                                                                  |
-//+------------------------------------------------------------------+
-bool MTAccount::cancelOrder(ulong ticket, string &result)
-  {
-#ifdef __MQL4__
-   return OrderDelete(ticket);
-#endif
-#ifdef __MQL5__
-   return this.trade.OrderDelete(ticket);
-#endif
-  }
-//+------------------------------------------------------------------+
-//|                                                                  |
-//+------------------------------------------------------------------+
-bool MTAccount::getPositions(string symbol,string &result)
+bool MTAccount::getTrades(string symbol,string &result)
   {
 #ifdef __MQL4__
    int modes[] = {OP_BUY, OP_SELL};
@@ -401,7 +401,7 @@ bool MTAccount::getPositions(string symbol,string &result)
       if(StringLen(symbol) > 0 && PositionGetString(POSITION_SYMBOL) != symbol)
          continue;
 
-      this.parsePosition(result);
+      this.parseTrade(result);
       hasData = true;
      }
 
@@ -417,9 +417,45 @@ bool MTAccount::getPositions(string symbol,string &result)
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-bool MTAccount::parsePosition(string &result)
+bool MTAccount::getTrade(ulong ticket, string &result)
   {
-// TICKET|SYMBOL|TYPE|OPEN_PRICE|OPEN_TIME|LOT|SL|TP|PNL|SWAP|COMMENT|CURRENT_PRICE
+#ifdef __MQL4__
+   if(!OrderSelect(ticket, SELECT_BY_TICKET, MODE_TRADES))
+      return false;
+#endif
+#ifdef __MQL5__
+   if(!PositionSelectByTicket(ticket))
+      return false;
+#endif
+
+   this.parseTrade(result);
+   result = StringSubstr(result, 0, StringLen(result)-1);
+   return true;
+  }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+bool MTAccount::closeTrade(ulong ticket, string &result)
+  {
+#ifdef __MQL4__
+   if(!OrderSelect(ticket, SELECT_BY_TICKET))
+      return false;
+   RefreshRates();
+
+   return OrderClose(ticket, OrderLots(), OrderClosePrice(), this.slippage);
+#endif
+#ifdef __MQL5__
+   return this.trade.PositionClose(ticket);
+#endif
+  }
+
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+bool MTAccount::parseTrade(string &result)
+  {
 #ifdef __MQL5__
    StringAdd(result, StringFormat("ticket=%d", PositionGetInteger(POSITION_TICKET)));
    StringAdd(result, StringFormat("|symbol=%s", PositionGetString(POSITION_SYMBOL)));

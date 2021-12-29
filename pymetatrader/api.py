@@ -193,6 +193,16 @@ class MetaTrader():
                 result.append(order)
             return result
 
+        if type == "TRADES":
+            result = []
+            raws = data.split(";")
+            for raw in raws:
+                event, trade = raw.split("|", 1)
+                trade = self._parse_trade(trade)
+                trade['status'] = event
+                result.append(trade)
+            return result
+
         raise RuntimeError(f"Cannot parse subscribe data: {type} {data}")
 
     ### MARKETS
@@ -331,6 +341,10 @@ class MetaTrader():
         data = self._request_and_wait(self.push_socket, 'TRADES', symbol)
         return self._parse_trades(data)
 
+    def close_trade(self, ticket):
+        self._request_and_wait(self.push_socket, 'CLOSE_TRADE', ticket)
+        return True
+
     def _parse_trades(self, data):
         raws = data.split(';')
         trades = []
@@ -377,16 +391,20 @@ class MetaTrader():
             orders.append(order)
         return orders
 
-    # TICKET|SYMBOL|TYPE|OPEN_PRICE|OPEN_TIME|LOT|SL|TP|PNL|COMMISSION|SWAP|EXPIRATION|COMMENT|CLOSE_PRICE|CLOSE_TIME
-    _order_keys = [['ticket', int], ['symbol', str], ['type', str],
-                   ['open_price', float],
-                   ['open_time', float], ['lots', float], ['sl', float],
-                   ['tp', float], ['pnl', float], ['commission', float],
-                   ['swap', float], ['expiration', float], ['comment', str],
-                   ['close_price', float], ['close_time', float]]
+    _order_format = dict(
+        ticket=int,
+        open_price=float,
+        open_time=float,
+        lots=float,
+        sl=float,
+        tp=float,
+        expiration=float,
+        close_price=float,
+        close_time=float,
+    )
 
     def _parse_order(self, raw):
-        order = self._parse_data_by_keys(raw, self._order_keys)
+        order = self._parse_data_dict(raw, self._order_format)
         order['symbol'] = self._parse_api_symbol(order['symbol'])
         order['open_time'] = order['open_time'] * 1000
         order['close_time'] = order['close_time'] * 1000
@@ -406,16 +424,8 @@ class MetaTrader():
                                       request)
         return True
 
-    def close_order(self, ticket):
-        data = self._request_and_wait(self.push_socket, 'CLOSE_ORDER', ticket)
-        if data != "OK":
-            raise RuntimeError(f"Close order {ticket} error: {data}")
-        return True
-
     def cancel_order(self, ticket):
-        data = self._request_and_wait(self.push_socket, 'CANCEL_ORDER', ticket)
-        if data != "OK":
-            raise RuntimeError(f"Cancel order {ticket} error: {data}")
+        self._request_and_wait(self.push_socket, 'CANCEL_ORDER', ticket)
         return True
 
     ### helpers
@@ -446,7 +456,7 @@ class MetaTrader():
         result = dict()
         for raw in raws:
             key, val = raw.split("=", 1)
-            type = format.get("key", str)
+            type = format.get(key, str)
             try:
                 result[key] = type(val)
             except:

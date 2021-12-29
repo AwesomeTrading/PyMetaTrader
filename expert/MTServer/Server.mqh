@@ -14,6 +14,37 @@
 #define PULL_PORT 32769
 #define PUB_PORT 32770
 
+
+enum ENUM_EVENTS
+  {
+   EVENT_OPENED,
+   EVENT_MODIFIED,
+   EVENT_COMPLETED,
+   EVENT_CANCELED,
+   EVENT_EXPIRED,
+  };
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+string EventToString(ENUM_EVENTS event)
+  {
+   switch(event)
+     {
+      case EVENT_OPENED:
+         return "OPENED";
+      case EVENT_MODIFIED:
+         return "MODIFIED";
+      case EVENT_COMPLETED:
+         return "COMPLETED";
+      case EVENT_CANCELED:
+         return "CANCELED";
+      case EVENT_EXPIRED:
+         return "EXPIRED";
+      default:
+         return "UNKNOWN";
+     }
+  }
+
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
@@ -61,12 +92,16 @@ private:
 
    // account
    void              processRequestFund(string &params[]);
+
    void              processRequestOrders(string &params[]);
-   void              processRequestTrades(string &params[]);
    void              processRequestOpenOrder(string &params[]);
    void              processRequestModifyOrder(string &params[]);
-   void              processRequestCloseOrder(string &params[]);
    void              processRequestCancelOrder(string &params[]);
+   void              throwOrderEvent(ENUM_EVENTS event, ulong ticket);
+
+   void              processRequestTrades(string &params[]);
+   void              processRequestCloseTrade(string &params[]);
+   void              throwTradeEvent(ENUM_EVENTS event, ulong ticket);
 
 public:
                      MTServer(ulong magic, int deviation);
@@ -416,6 +451,12 @@ void MTServer::processRequest(string &params[])
       this.processRequestTrades(params);
       return;
      }
+
+   if(action == "CLOSE_TRADE")
+     {
+      this.processRequestCloseTrade(params);
+      return;
+     }
    if(action == "ORDERS")
      {
       this.processRequestOrders(params);
@@ -429,11 +470,6 @@ void MTServer::processRequest(string &params[])
    if(action == "MODIFY_ORDER")
      {
       this.processRequestModifyOrder(params);
-      return;
-     }
-   if(action == "CLOSE_ORDER")
-     {
-      this.processRequestCloseOrder(params);
       return;
      }
    if(action == "CANCEL_ORDER")
@@ -563,10 +599,49 @@ void MTServer::processRequestTrades(string &params[])
   {
    string symbol = params[2];
    string result = "";
-   this.account.getPositions(symbol, result);
+   this.account.getTrades(symbol, result);
    this.requestReply(params[1], result);
   }
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+void MTServer::processRequestCloseTrade(string &params[])
+  {
+#ifdef __MQL4__
+   ulong ticket = StrToInteger(params[2]);
+#endif
+#ifdef __MQL5__
+   ulong ticket = StringToInteger(params[2]);
+#endif
 
+   string result = "";
+   bool ok = this.account.closeTrade(ticket, result);
+   this.requestReply(params[1], result);
+
+// event COMPLETED TRADE
+   this.throwTradeEvent(EVENT_COMPLETED, ticket);
+  }
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+void MTServer::throwTradeEvent(ENUM_EVENTS event, ulong ticket)
+  {
+   string trade = "";
+   switch(event)
+     {
+      case EVENT_CANCELED:
+      case EVENT_COMPLETED:
+         this.account.getHistoryOrder(ticket, trade);
+         break;
+      default:
+         this.account.getTrade(ticket, trade);
+         break;
+     }
+   trade = StringSubstr(trade, 0, StringLen(trade)-1);
+
+   string result = StringFormat("TRADES %s|%s", EventToString(event), trade);
+   this.reply(pubSocket, result);
+  }
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
@@ -599,10 +674,16 @@ void MTServer::processRequestOpenOrder(string &params[])
    StringAdd(result, IntegerToString(ticket));
    this.requestReply(params[1], result);
 
-// put event OPEN ORDER
-   string event = "ORDERS ";
-   this.account.getOrderEventByTicket(ticket, EVENT_ORDER_OPENED, event);
-   this.reply(pubSocket, event);
+// Throw event
+// Market order return trade ticket
+   if(type == ORDER_TYPE_BUY || type == ORDER_TYPE_SELL)
+     {
+      this.throwTradeEvent(EVENT_OPENED, ticket);
+     }
+   else
+     {
+      this.throwOrderEvent(EVENT_OPENED, ticket);
+     }
   }
 
 //+------------------------------------------------------------------+
@@ -627,33 +708,10 @@ void MTServer::processRequestModifyOrder(string &params[])
    bool ok = this.account.modifyOrder(ticket, price, sl, tp, expiration, result);
    this.requestReply(params[1], result);
 
-// put event MODIFY ORDER
-   string event = "ORDERS ";
-   this.account.getOrderEventByTicket(ticket, EVENT_ORDER_MODIFIED, event);
-   this.reply(pubSocket, event);
+// event MODIFY ORDER
+   this.throwOrderEvent(EVENT_MODIFIED, ticket);
   }
 
-//+------------------------------------------------------------------+
-//|                                                                  |
-//+------------------------------------------------------------------+
-void MTServer::processRequestCloseOrder(string &params[])
-  {
-#ifdef __MQL4__
-   ulong ticket = StrToInteger(params[2]);
-#endif
-#ifdef __MQL5__
-   ulong ticket = StringToInteger(params[2]);
-#endif
-
-   string result = "";
-   bool ok = this.account.closeOrder(ticket, result);
-   this.requestReply(params[1], result);
-
-// put event COMPLETED ORDER
-   string event = "ORDERS ";
-   this.account.getOrderEventByTicket(ticket, EVENT_ORDER_COMPLETED, event);
-   this.reply(pubSocket, event);
-  }
 
 //+------------------------------------------------------------------+
 //|                                                                  |
@@ -667,18 +725,33 @@ void MTServer::processRequestCancelOrder(string &params[])
    ulong ticket = StringToInteger(params[2]);
 #endif
 
-   string result = StringFormat("CANCEL_ORDER|%s|", params[1]);
-   bool ok = this.account.cancelOrder(ticket, result);
-   if(ok)
-      StringAdd(result, "OK");
-   else
-      StringAdd(result, GetLastErrorMessage());
+   string result = "";
+   this.account.cancelOrder(ticket, result);
+   this.requestReply(params[1], result);
 
-   this.reply(pushSocket, result);
+// event CANCEL ORDER
+   this.throwOrderEvent(EVENT_CANCELED, ticket);
+  }
 
-// put event CANCEL ORDER
-   string event = "ORDERS ";
-   this.account.getOrderEventByTicket(ticket, EVENT_ORDER_CANCELED, event);
-   this.reply(pubSocket, event);
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+void MTServer::throwOrderEvent(ENUM_EVENTS event, ulong ticket)
+  {
+   string order = "";
+   switch(event)
+     {
+      case EVENT_CANCELED:
+      case EVENT_COMPLETED:
+         this.account.getHistoryOrder(ticket, order);
+         break;
+      default:
+         this.account.getOrder(ticket, order);
+         break;
+     }
+   order = StringSubstr(order, 0, StringLen(order)-1);
+
+   string result = StringFormat("ORDERS %s|%s", EventToString(event), order);
+   this.reply(pubSocket, result);
   }
 //+------------------------------------------------------------------+
