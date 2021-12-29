@@ -69,7 +69,7 @@ private:
    void              processRequestCancelOrder(string &params[]);
 
 public:
-                     MTServer();
+                     MTServer(ulong magic, int deviation);
    bool              start();
    bool              stop();
    void              onTick();
@@ -79,7 +79,7 @@ public:
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-void MTServer::MTServer(void)
+void MTServer::MTServer(ulong magic, int deviation)
   {
    this.context = new Context(PROJECT_NAME);
    this.pushSocket = new Socket(this.context, ZMQ_PUSH);
@@ -87,7 +87,7 @@ void MTServer::MTServer(void)
    this.pubSocket = new Socket(this.context, ZMQ_PUB);
 
    this.markets = new MTMarkets();
-   this.account = new MTAccount();
+   this.account = new MTAccount(magic, deviation);
 
    this.pingExpire = TimeCurrent() + 30; // expire at next 30 seconds
   }
@@ -344,7 +344,7 @@ void MTServer::requestReply(string &id, string &message)
      {
       msg = StringFormat("KO|%s|%s", id, GetErrorDescription(errorCode));
      }
-   
+
    ResetLastError();
    this.reply(pushSocket, msg);
   }
@@ -561,16 +561,9 @@ void MTServer::processRequestFund(string &params[])
 //+------------------------------------------------------------------+
 void MTServer::processRequestTrades(string &params[])
   {
-#ifdef __MQL4__
-   int modes[] = {OP_BUY, OP_SELL};
-#endif
-#ifdef __MQL5__
-   int modes[] = {ORDER_TYPE_BUY, ORDER_TYPE_SELL};
-#endif
-
    string symbol = params[2];
    string result = "";
-   this.account.getOrders(symbol, modes, result);
+   this.account.getPositions(symbol, result);
    this.requestReply(params[1], result);
   }
 
@@ -603,7 +596,7 @@ void MTServer::processRequestOpenOrder(string &params[])
    string result = "";
    ulong ticket = this.account.openOrder(symbol, type, lots, price, sl, tp, comment, result);
 
-   StringAdd(result, DoubleToString(ticket));
+   StringAdd(result, IntegerToString(ticket));
    this.requestReply(params[1], result);
 
 // put event OPEN ORDER

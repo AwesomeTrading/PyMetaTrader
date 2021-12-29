@@ -357,12 +357,14 @@ class MetaTrader():
 
     def _parse_order(self, raw):
         order = self._parse_data_by_keys(raw, self._order_keys)
+        order['symbol'] = self._parse_api_symbol(order['symbol'])
         order['open_time'] = order['open_time'] * 1000
         order['close_time'] = order['close_time'] * 1000
         order['expiration'] = order['expiration'] * 1000
         return order
 
     def open_order(self, symbol, type, lots, price, sl=0, tp=0, comment=''):
+        symbol = self._parse_broker_symbol(symbol)
         request = f"{symbol};{type};{lots};{price};{sl};{tp};{comment}"
         ticket = self._request_and_wait(self.push_socket, 'OPEN_ORDER',
                                         request)

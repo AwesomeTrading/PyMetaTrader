@@ -7,7 +7,6 @@
 
 #ifdef __MQL5__
 #include <Trade\Trade.mqh>
-CTrade m_trade;
 #endif
 
 enum ENUM_ORDER_EVENTS
@@ -45,15 +44,21 @@ string OrderEventToString(ENUM_ORDER_EVENTS event)
 class MTAccount
   {
 private:
+#ifdef __MQL4__
    int               magic;
    int               slippage;
+#endif
+#ifdef __MQL5__
+   CTrade            trade;
+#endif
    datetime          orderEventCheckTime;
 
    bool              parseOrder(string &result);
 
 public:
-   void              MTAccount();
+   void              MTAccount(ulong magic, int deviation);
    bool              getFund(string &result);
+   // Order
    bool              getOrders(string symbol, int &modes[], string &result);
    bool              getOrderByTicket(ulong ticket, string &result);
    ulong             openOrder(string symbol, int type, double lots, double price, double sl, double tp, string comment, string &result);
@@ -65,15 +70,25 @@ public:
    int               getNewOrdersEvents(string &result);
    bool              getOrderEventByTicket(ulong ticket, ENUM_ORDER_EVENTS event, string &result);
    bool              parseSelectedOrderEvent(ENUM_ORDER_EVENTS event, string &result);
+
+   // Position
+   bool              getPositions(string symbol, string &result);
+   bool              parsePosition(string &result);
   };
 
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-void MTAccount::MTAccount()
+void MTAccount::MTAccount(ulong magic, int deviation)
   {
-   this.magic = 112233;
-   this.slippage = 3;
+#ifdef __MQL4__
+   this.magic = magic;
+   this.slippage = deviation;
+#endif
+#ifdef __MQL5__
+   this.trade.SetExpertMagicNumber(magic);
+   this.trade.SetDeviationInPoints(deviation);
+#endif
 
    this.orderEventCheckTime = TimeCurrent();
   }
@@ -114,7 +129,7 @@ bool MTAccount::getOrders(string symbol, int &modes[], string &result)
          continue;
 #endif
 #ifdef __MQL5__
-      if(!OrderSelect(i))
+      if(OrderGetTicket(i) <= 0)
          continue;
       if(StringLen(symbol) > 0 && OrderGetString(ORDER_SYMBOL) != symbol)
          continue;
@@ -281,22 +296,21 @@ ulong MTAccount::openOrder(string symbol, int type, double lots, double price, d
    return OrderSend(symbol, type, lots, price, this.slippage, sl, tp, comment, this.magic);
 #endif
 #ifdef __MQL5__
-   MqlTradeRequest oreq= {};
-   oreq.action=TRADE_ACTION_PENDING;
-   oreq.magic=this.magic;
-   oreq.symbol=symbol;
-   oreq.volume=lots;
-   oreq.sl=sl;
-   oreq.tp=tp;
-   oreq.type=(ENUM_ORDER_TYPE)type;
-   oreq.price=price;
-   oreq.comment=comment;
-   MqlTradeResult ores= {};
-   bool ok = OrderSend(oreq, ores);
+   bool ok;
+   switch(type)
+     {
+      case ORDER_TYPE_BUY:
+      case ORDER_TYPE_SELL:
+         ok = this.trade.PositionOpen(symbol, (ENUM_ORDER_TYPE)type, lots, price, sl, tp, comment);
+         break;
+      default:
+         ok = this.trade.OrderOpen(symbol, (ENUM_ORDER_TYPE)type, lots, NULL, price, sl, tp, ORDER_TIME_GTC, 0, comment);
+         break;
+     }
 
-   if(!ok)
-      return -1;
-   return ores.order;
+   if(ok)
+      return this.trade.ResultOrder();
+   return 0;
 #endif
   }
 
@@ -313,7 +327,7 @@ bool MTAccount::modifyOrder(ulong ticket, double price, double sl, double tp, da
    return OrderModify(ticket, price, sl, tp, expiration);
 #endif
 #ifdef __MQL5__
-   return m_trade.OrderModify(ticket, price, sl, tp, ORDER_TIME_GTC, expiration);
+   return this.trade.OrderModify(ticket, price, sl, tp, ORDER_TIME_GTC, expiration);
 #endif
   }
 
@@ -328,7 +342,7 @@ bool MTAccount::closePartialOrder(ulong ticket, double lots, double price, strin
    return OrderClose(ticket, lots, price, this.slippage);
 #endif
 #ifdef __MQL5__
-   return m_trade.PositionClosePartial(ticket, lots, this.slippage);
+   return this.trade.PositionClosePartial(ticket, lots);
 #endif
   }
 
@@ -348,7 +362,7 @@ bool MTAccount::closeOrder(ulong ticket, string &result)
    if(!OrderSelect(ticket))
       return false;
 
-   return m_trade.PositionClose(ticket);
+   return this.trade.PositionClose(ticket);
 #endif
   }
 
@@ -361,7 +375,71 @@ bool MTAccount::cancelOrder(ulong ticket, string &result)
    return OrderDelete(ticket);
 #endif
 #ifdef __MQL5__
-   return m_trade.OrderDelete(ticket);
+   return this.trade.OrderDelete(ticket);
 #endif
+  }
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+bool MTAccount::getPositions(string symbol,string &result)
+  {
+#ifdef __MQL4__
+   int modes[] = {OP_BUY, OP_SELL};
+   return this.getOrders(symbol, modes, result);
+#endif
+#ifdef __MQL5__
+   int total = PositionsTotal();
+   if(total == 0)
+      return true;
+
+// loop
+   bool hasData = false;
+   for(int i = 0; i < total; i++)
+     {
+      if("" != PositionGetSymbol(i))
+         continue;
+      if(StringLen(symbol) > 0 && PositionGetString(POSITION_SYMBOL) != symbol)
+         continue;
+
+      this.parsePosition(result);
+      hasData = true;
+     }
+
+   if(hasData)
+     {
+      result = StringSubstr(result, 0, StringLen(result)-1);
+     }
+   return true;
+#endif
+
+  }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+bool MTAccount::parsePosition(string &result)
+  {
+// TICKET|SYMBOL|TYPE|OPEN_PRICE|OPEN_TIME|LOT|SL|TP|PNL|COMMISSION|SWAP|EXPIRATION|COMMENT|CLOSE_PRICE|CLOSE_TIME
+
+#ifdef __MQL5__
+   string order = StringFormat("%d|%s|%s|%g|%f|%g|%g|%g|%g|%g|%g|%f|%s|%g|%f;",
+                               PositionGetInteger(POSITION_TICKET),
+                               PositionGetString(POSITION_SYMBOL),
+                               OperationTypeToString(PositionGetInteger(POSITION_TYPE)),
+                               PositionGetDouble(POSITION_PRICE_OPEN),
+                               PositionGetInteger(POSITION_TIME),
+                               PositionGetDouble(POSITION_VOLUME),
+                               PositionGetDouble(POSITION_SL),
+                               PositionGetDouble(POSITION_TP),
+                               PositionGetDouble(POSITION_PROFIT),
+                               0.0,
+                               PositionGetDouble(POSITION_SWAP),
+                               0,
+                               PositionGetString(POSITION_COMMENT),
+                               PositionGetDouble(POSITION_PRICE_CURRENT),
+                               0.0
+                              );
+#endif
+   return StringAdd(result, order);
   }
 //+------------------------------------------------------------------+

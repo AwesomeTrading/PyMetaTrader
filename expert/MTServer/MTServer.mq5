@@ -4,13 +4,15 @@
 //|                                             https://www.mql5.com |
 //+------------------------------------------------------------------+
 #include "./Server.mqh"
-
-MTServer server;
+#define MAGIC_NUMBER 1122334455
+#define DEVIATION 10
+MTServer *server;
 //+------------------------------------------------------------------+
 //| Expert initialization function                                   |
 //+------------------------------------------------------------------+
 int OnInit()
   {
+   server = new MTServer(MAGIC_NUMBER, DEVIATION);
    EventSetMillisecondTimer(10);
 
 //---
