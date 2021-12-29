@@ -174,6 +174,7 @@ class MetaTrader():
             raws = data.split(";")
             for raw in raws:
                 symbol, timeframe, bar = raw.split("|", 2)
+                symbol = symbol[:3] + '/' + symbol[3:]
                 bar = self._parse_bar(bar)
                 result.append((symbol, timeframe, bar))
             return result

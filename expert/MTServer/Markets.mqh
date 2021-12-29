@@ -395,11 +395,11 @@ void MTMarkets::parseQuote(string symbol, string &result)
    double spread = MarketInfo(symbol, MODE_SPREAD);
 #endif
 #ifdef __MQL5__
-   MqlTick last_tick;
-   SymbolInfoTick(_Symbol, last_tick);
+   MqlTick lastTick;
+   SymbolInfoTick(symbol, lastTick);
 
-   double bid = last_tick.bid;
-   double ask = last_tick.ask;
+   double bid = lastTick.bid;
+   double ask = lastTick.ask;
    double spread = (double)SymbolInfoInteger(symbol, SYMBOL_SPREAD);
 #endif
 
@@ -409,8 +409,9 @@ void MTMarkets::parseQuote(string symbol, string &result)
    double low = iLow(symbol, PERIOD_D1, 0);
    double close = iClose(symbol, PERIOD_D1, 0);
    long volume = iVolume(symbol, PERIOD_D1, 0);
+   
 // bypass: skip download bar data if missing data
-   GetLastError();
+   ResetLastError();
 
    double prevClose = iClose(symbol, PERIOD_D1, 1);
    double change = close - prevClose;
