@@ -31,6 +31,7 @@ class MetaTrader():
         self.sub_port = sub_port
         self.url = "tcp://" + self.host + ":"
         self.q_sub = q
+        self.markets = dict()
 
         # ZeroMQ Context
         self.context = zmq.Context()
@@ -174,7 +175,7 @@ class MetaTrader():
             raws = data.split(";")
             for raw in raws:
                 symbol, timeframe, bar = raw.split("|", 2)
-                symbol = symbol[:3] + '/' + symbol[3:]
+                symbol = self._parse_api_symbol(symbol)
                 bar = self._parse_bar(bar)
                 result.append((symbol, timeframe, bar))
             return result
@@ -255,6 +256,8 @@ class MetaTrader():
         markets = []
         for raw in raws:
             markets.append(self._parse_market(raw))
+
+        self.markets = {m['id']: m for m in markets}
         return markets
 
     # SYMBOL|SYMBOL_DESCRIPTION|SYMBOL_CURRENCY_BASE|MODE_POINT|MODE_DIGITS|MODE_MINLOT|MODE_LOTSTEP|MODE_MAXLOT|MODE_TICKSIZE|TIME_GMTOFFSET
@@ -265,7 +268,13 @@ class MetaTrader():
 
     def _parse_market(self, data):
         market = self._parse_data_by_keys(data, self._market_keys)
-        market['symbol'] = market['symbol'][:3] + '/' + market['symbol'][3:]
+        symbol = market['symbol']
+        market['id'] = symbol
+
+        # Transform EURUSD to EUR/USD
+        if len(symbol) == 6 and (symbol.startswith(market['currency'])
+                                 or symbol.endswith(market['currency'])):
+            market['symbol'] = symbol[:3] + '/' + symbol[3:]
         return market
 
     # quote
@@ -297,7 +306,7 @@ class MetaTrader():
 
     def _parse_quote(self, data):
         quote = self._parse_data_by_keys(data, self._quote_keys)
-        quote['symbol'] = quote['symbol'][:3] + '/' + quote['symbol'][3:]
+        quote['symbol'] = self._parse_api_symbol(quote['symbol'])
         return quote
 
     def subscribe_quotes(self, symbol):
@@ -380,6 +389,11 @@ class MetaTrader():
     ### helpers
     def _parse_broker_symbol(self, symbol: str):
         return symbol.replace("/", "")
+
+    def _parse_api_symbol(self, symbol: str):
+        if len(self.markets) == 0:
+            return symbol[:3] + '/' + symbol[3:]
+        return self.markets[symbol]['symbol']
 
     def _parse_data_by_keys(self, data, keys):
         raw = data.split('|')
