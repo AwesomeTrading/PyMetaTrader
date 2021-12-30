@@ -1,6 +1,4 @@
 # MetaTrader
-*.ex4
-*.ex5
 *$DATA
 
 # Byte-compiled / optimized / DLL files

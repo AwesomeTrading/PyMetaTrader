@@ -371,15 +371,49 @@ class MetaTrader():
         tp=float,
         pnl=float,
         swap=float,
-        current_price=float,
     )
 
     def _parse_trade(self, raw):
         trade = self._parse_data_dict(raw, self._trade_format)
         trade['symbol'] = self._parse_api_symbol(trade['symbol'])
         trade['open_time'] = trade['open_time'] * 1000
-        trade['current_price'] = trade['current_price'] * 1000
         return trade
+
+    # deals
+    def get_deals(self, symbol='', fromdate=0):
+        symbol = self._parse_broker_symbol(symbol)
+        request = "{};{}".format(symbol, fromdate)
+        data = self._request_and_wait(self.push_socket, 'DEALS', request)
+        return self._parse_deals(data)
+
+    def _parse_deals(self, data):
+        raws = data.split(';')
+        deals = []
+        for raw in raws:
+            if not raw: continue
+            deal = self._parse_deal(raw)
+            deals.append(deal)
+        return deals
+
+    _deal_format = dict(
+        ticket=int,
+        order=int,
+        position=int,
+        price=float,
+        time=float,
+        lots=float,
+        sl=float,
+        tp=float,
+        commission=float,
+        swap=float,
+        pnl=float,
+    )
+
+    def _parse_deal(self, raw):
+        deal = self._parse_data_dict(raw, self._deal_format)
+        deal['symbol'] = self._parse_api_symbol(deal['symbol'])
+        deal['time'] = deal['time'] * 1000
+        return deal
 
     # orders
     def get_open_orders(self):
