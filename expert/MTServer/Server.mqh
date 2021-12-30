@@ -58,6 +58,8 @@ private:
    MTMarkets         *markets;
    MTAccount         *account;
    datetime          pingExpire;
+   datetime          tradeRefreshFrom;
+   datetime          tradeRefreshStart;
 
    bool              startSockets();
    bool              stopSockets();
@@ -97,14 +99,15 @@ private:
    bool              processRequestOpenOrder(string &params[]);
    bool              processRequestModifyOrder(string &params[]);
    bool              processRequestCancelOrder(string &params[]);
-   void              throwOrderEvent(ENUM_EVENTS event, ulong ticket);
 
    bool              processRequestTrades(string &params[]);
    bool              processRequestModifyTrade(string &params[]);
    bool              processRequestCloseTrade(string &params[]);
-   void              throwTradeEvent(ENUM_EVENTS event, ulong ticket, string trade);
 
    bool              processRequestDeals(string &params[]);
+
+   bool              processRequestRefreshTrades(string &params[]);
+   void              refreshTrades(void);
 public:
                      MTServer(ulong magic, int deviation);
    bool              start();
@@ -128,6 +131,12 @@ void MTServer::MTServer(ulong magic, int deviation)
    this.account = new MTAccount(magic, deviation);
 
    this.pingExpire = TimeCurrent() + 30; // expire at next 30 seconds
+   this.tradeRefreshFrom = TimeCurrent();
+
+// 0 equal no order
+   this.tradeRefreshStart = this.account.getOrdersMinTime();
+   if(this.tradeRefreshStart == 0)
+      this.tradeRefreshStart = TimeCurrent();
   }
 //+------------------------------------------------------------------+
 //|                                                                  |
@@ -185,22 +194,7 @@ void MTServer::onTimer(void)
 //+------------------------------------------------------------------+
 void MTServer::onTrade(void)
   {
-// History
-   string historyOrders = StringFormat("ORDERS %s|", EventToString(EVENT_COMPLETED));
-   string historyDeals = StringFormat("DEALS %s|", EventToString(EVENT_COMPLETED));
-   this.account.checkHistory(historyOrders, historyDeals);
-   this.reply(pubSocket, historyOrders);
-   this.reply(pubSocket, historyDeals);
-
-// Open orders
-   string orders = StringFormat("ORDERS %s|", EventToString(EVENT_MODIFIED));
-   this.account.getOrders(orders);
-   this.reply(pubSocket, orders);
-
-// Trades
-   string trades = StringFormat("TRADES %s|", EventToString(EVENT_MODIFIED));
-   this.account.getTrades(trades);
-   this.reply(pubSocket, trades);
+   this.refreshTrades();
   }
 //+------------------------------------------------------------------+
 //|                                                                  |
@@ -461,6 +455,9 @@ bool MTServer::processRequest(string &params[])
    if(action == "DEALS")
       return this.processRequestDeals(params);
 
+   if(action == "REFRESH_TRADES")
+      return this.processRequestRefreshTrades(params);
+
    return false;
   }
 
@@ -568,7 +565,7 @@ bool MTServer::processRequestMarkets(string &params[])
   }
 
 //+------------------------------------------------------------------+
-//|                                                                  |
+//| FUND                                                             |
 //+------------------------------------------------------------------+
 bool MTServer::processRequestFund(string &params[])
   {
@@ -605,17 +602,7 @@ bool MTServer::processRequestOpenOrder(string &params[])
    ulong ticket = this.account.openOrder(symbol, type, lots, price, sl, tp, comment, result);
 
    StringAdd(result, IntegerToString(ticket));
-   this.requestReply(params[1], result);
-
-// Throw event
-   if(ticket > 0)
-      // Market order return trade ticket
-      if(type == ORDER_TYPE_BUY || type == ORDER_TYPE_SELL)
-         this.throwTradeEvent(EVENT_OPENED, ticket);
-      else
-         this.throwOrderEvent(EVENT_OPENED, ticket);
-
-   return ticket > 0;
+   return this.requestReply(params[1], result);
   }
 
 //+------------------------------------------------------------------+
@@ -637,13 +624,8 @@ bool MTServer::processRequestModifyOrder(string &params[])
 
 // process
    string result = "";
-   bool ok = this.account.modifyOrder(ticket, price, sl, tp, expiration, result);
-   this.requestReply(params[1], result);
-
-// event MODIFY ORDER
-   if(ok)
-      this.throwOrderEvent(EVENT_MODIFIED, ticket);
-   return ok;
+   this.account.modifyOrder(ticket, price, sl, tp, expiration, result);
+   return this.requestReply(params[1], result);
   }
 
 //+------------------------------------------------------------------+
@@ -659,34 +641,8 @@ bool MTServer::processRequestCancelOrder(string &params[])
 #endif
 
    string result = "";
-   bool ok = this.account.cancelOrder(ticket, result);
-   this.requestReply(params[1], result);
-
-// event CANCEL ORDER
-   if(ok)
-      this.throwOrderEvent(EVENT_CANCELED, ticket);
-   return ok;
-  }
-
-//+------------------------------------------------------------------+
-//|                                                                  |
-//+------------------------------------------------------------------+
-void MTServer::throwOrderEvent(ENUM_EVENTS event, ulong ticket)
-  {
-   string order = "";
-   switch(event)
-     {
-      case EVENT_CANCELED:
-      case EVENT_COMPLETED:
-         this.account.getHistoryOrder(ticket, order);
-         break;
-      default:
-         this.account.getOrder(ticket, order);
-         break;
-     }
-
-   string result = StringFormat("ORDERS %s|%s", EventToString(event), order);
-   this.reply(pubSocket, result);
+   this.account.cancelOrder(ticket, result);
+   return this.requestReply(params[1], result);
   }
 
 //+------------------------------------------------------------------+
@@ -715,13 +671,8 @@ bool MTServer::processRequestModifyTrade(string &params[])
 
 // process
    string result = "";
-   bool ok = this.account.modifyTrade(ticket, sl, tp, result);
-   this.requestReply(params[1], result);
-
-// event MODIFY ORDER
-   if(ok)
-      this.throwTradeEvent(EVENT_MODIFIED, ticket);
-   return ok;
+   this.account.modifyTrade(ticket, sl, tp, result);
+   return this.requestReply(params[1], result);
   }
 
 //+------------------------------------------------------------------+
@@ -739,30 +690,8 @@ bool MTServer::processRequestCloseTrade(string &params[])
    this.account.getTrade(ticket, trade);
 
    string result = "";
-   bool ok = this.account.closeTrade(ticket, result);
-   this.requestReply(params[1], result);
-
-// event COMPLETED TRADE
-   if(ok)
-      this.throwTradeEvent(EVENT_COMPLETED, ticket, trade);
-   return ok;
-  }
-//+------------------------------------------------------------------+
-//|                                                                  |
-//+------------------------------------------------------------------+
-void MTServer::throwTradeEvent(ENUM_EVENTS event, ulong ticket, string trade = "")
-  {
-   switch(event)
-     {
-      case EVENT_COMPLETED:
-         break;
-      default:
-         this.account.getTrade(ticket, trade);
-         break;
-     }
-
-   string result = StringFormat("TRADES %s|%s", EventToString(event), trade);
-   this.reply(pubSocket, result);
+   this.account.closeTrade(ticket, result);
+   return this.requestReply(params[1], result);
   }
 //+------------------------------------------------------------------+
 //| DEALS                                                            |
@@ -775,5 +704,49 @@ bool MTServer::processRequestDeals(string &params[])
    string result = "";
    this.account.getHistoryDeals(result, symbol, fromDate);
    return this.requestReply(params[1], result);
+  }
+
+//+------------------------------------------------------------------+
+//| REFRESH                                                          |
+//+------------------------------------------------------------------+
+bool MTServer::processRequestRefreshTrades(string &params[])
+  {
+   string result = "";
+   this.refreshTrades();
+   return this.requestReply(params[1], result);
+  }
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+void MTServer::refreshTrades(void)
+  {
+   datetime now = TimeCurrent();
+   if(now <= this.tradeRefreshFrom)
+      return;
+
+// History orders
+   string historyOrders = "HISTORY_ORDERS ";
+   this.account.getHistoryOrders(historyOrders, "", this.tradeRefreshStart, now+1);
+
+// History deals
+   string historyDeals = "HISTORY_DEALS ";
+   this.account.getHistoryDeals(historyDeals, "", this.tradeRefreshStart, now+1);
+
+// Open orders
+   string orders = "ORDERS ";
+   this.account.getOrders(orders);
+
+// Trades
+   string trades = "TRADES ";
+   this.account.getTrades(trades);
+
+   string refresh = StringFormat("REFRESH %s\n%s\n%s\n%s", historyOrders, historyDeals, orders, trades);
+   this.reply(pubSocket, refresh);
+
+// Refresh params
+   this.tradeRefreshFrom = now;
+   this.tradeRefreshStart = this.account.getOrdersMinTime();
+   if(this.tradeRefreshStart == 0)
+      this.tradeRefreshStart = now;
   }
 //+------------------------------------------------------------------+
