@@ -48,8 +48,7 @@ class MetaTrader():
         self.sub_socket = self.context.socket(zmq.SUB)
         self.sub_socket.setsockopt_string(zmq.SUBSCRIBE, "BARS")
         self.sub_socket.setsockopt_string(zmq.SUBSCRIBE, "QUOTES")
-        self.sub_socket.setsockopt_string(zmq.SUBSCRIBE, "ORDERS")
-        self.sub_socket.setsockopt_string(zmq.SUBSCRIBE, "TRADES")
+        self.sub_socket.setsockopt_string(zmq.SUBSCRIBE, "REFRESH")
 
         # Bind PUSH Socket to send commands to MetaTrader
         self.push_socket.connect(self.url + str(self.push_port))
@@ -146,7 +145,7 @@ class MetaTrader():
                     else:
                         print("Abandoned message: ", msg)
                 except Exception as e:
-                    print("Wait socket data error: ", e)
+                    print("Wait socket data error: ", e, msg)
 
     def _request(self, socket, action, msg=''):
         request_id = random_id()
@@ -184,25 +183,31 @@ class MetaTrader():
         if type == "QUOTES":
             return self._parse_quotes(data)
 
-        if type == "ORDERS":
-            result = []
-            raws = data.split(";")
+        if type == "REFRESH":
+            raws = data.split("\n")
+            history_orders = []
+            history_deals = []
+            orders = []
+            trades = []
             for raw in raws:
-                event, order = raw.split("|", 1)
-                order = self._parse_order(order)
-                order['status'] = event
-                result.append(order)
-            return result
+                event, data = raw.split(" ", 1)
+                if not data:
+                    continue
+                if event == "HISTORY_ORDERS":
+                    history_orders.extend(self._parse_orders(data))
+                elif event == "HISTORY_DEALS":
+                    history_deals.extend(self._parse_deals(data))
+                elif event == "ORDERS":
+                    orders.extend(self._parse_orders(data))
+                elif event == "TRADES":
+                    trades.extend(self._parse_trades(data))
 
-        if type == "TRADES":
-            result = []
-            raws = data.split(";")
-            for raw in raws:
-                event, trade = raw.split("|", 1)
-                trade = self._parse_trade(trade)
-                trade['status'] = event
-                result.append(trade)
-            return result
+            return dict(
+                history_orders=history_orders,
+                history_deals=history_deals,
+                orders=orders,
+                trades=trades,
+            )
 
         raise RuntimeError(f"Cannot parse subscribe data: {type} {data}")
 
@@ -239,7 +244,6 @@ class MetaTrader():
         return self._parse_bars(data)
 
     def _parse_bars(self, data):
-        # data = data.split('|', 2)[2]
         raws = data.split(';')
         bars = []
         for raw in raws:
@@ -433,14 +437,14 @@ class MetaTrader():
 
     _order_format = dict(
         ticket=int,
+        position=int,
         open_price=float,
         open_time=float,
+        close_time=float,
         lots=float,
         sl=float,
         tp=float,
         expiration=float,
-        close_price=float,
-        close_time=float,
     )
 
     def _parse_order(self, raw):

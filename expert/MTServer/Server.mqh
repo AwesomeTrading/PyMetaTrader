@@ -59,6 +59,7 @@ private:
    datetime          pingExpire;
    datetime          tradeRefreshFrom;
    datetime          tradeRefreshStart;
+   datetime          tradeRefreshAt;
 
    bool              startSockets();
    bool              stopSockets();
@@ -106,7 +107,8 @@ private:
 
    bool              processRequestRefreshTrades(string &params[]);
    void              refreshTrades(void);
-
+   void              checkRefreshTrades(void);
+   void              doRefreshTrades(void);
 public:
                      MTServer(ulong magic, int deviation);
    bool              start();
@@ -133,6 +135,7 @@ void MTServer::MTServer(ulong magic, int deviation)
    this.tradeRefreshFrom = TimeCurrent();
 
 // 0 equal no order
+   this.tradeRefreshAt = 0;
    this.tradeRefreshStart = this.account.getOrdersMinTime();
    if(this.tradeRefreshStart == 0)
       this.tradeRefreshStart = TimeCurrent();
@@ -187,6 +190,7 @@ void MTServer::onTick(void)
 void MTServer::onTimer(void)
   {
    this.checkRequest();
+   this.checkRefreshTrades();
   }
 //+------------------------------------------------------------------+
 //|                                                                  |
@@ -719,10 +723,34 @@ bool MTServer::processRequestRefreshTrades(string &params[])
 //+------------------------------------------------------------------+
 void MTServer::refreshTrades(void)
   {
-   datetime now = TimeCurrent();
-   if(now <= this.tradeRefreshFrom)
+   this.tradeRefreshAt = TimeCurrent() + 1;
+  }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+void MTServer::checkRefreshTrades(void)
+  {
+   if(this.tradeRefreshAt == 0)
+      return;
+   if(this.tradeRefreshAt > TimeCurrent())
       return;
 
+   this.doRefreshTrades();
+   this.tradeRefreshAt = 0;
+  }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+void MTServer::doRefreshTrades(void)
+  {
+   datetime now = TimeCurrent();
+   if(now <= this.tradeRefreshFrom)
+     {
+      Print("Skip refresh trades at: ", now);
+      return;
+     }
 // History orders
    string historyOrders = "HISTORY_ORDERS ";
    this.account.getHistoryOrders(historyOrders, "", this.tradeRefreshStart, now + 1);
