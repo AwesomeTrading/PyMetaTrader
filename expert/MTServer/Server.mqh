@@ -3,9 +3,9 @@
 //+------------------------------------------------------------------+
 
 #include <Zmq/Zmq.mqh>
-#include  "Markets.mqh"
-#include  "Account.mqh"
-#include  "Helper.mqh"
+#include "Markets.mqh"
+#include "Account.mqh"
+#include "Helper.mqh"
 
 #define PROJECT_NAME "MTSERVER"
 #define ZEROMQ_PROTOCOL "tcp"
@@ -13,7 +13,6 @@
 #define PUSH_PORT 32768
 #define PULL_PORT 32769
 #define PUB_PORT 32770
-
 
 enum ENUM_EVENTS
   {
@@ -64,7 +63,7 @@ private:
    bool              startSockets();
    bool              stopSockets();
    bool              status();
-   bool              reply(Socket& socket, string message);
+   bool              reply(Socket &socket, string message);
 
    // subscribers
    void              checkSubscribers();
@@ -72,10 +71,9 @@ private:
    bool              processSubBars();
    bool              processSubQuotes();
 
-
    // request
    void              checkRequest();
-   void              parseRequest(string& message, string& retArray[]);
+   void              parseRequest(string &message, string &retArray[]);
    bool              requestReply(string &id, string &message);
    bool              processRequest(string &compArray[]);
    bool              processRequestPing(string &params[]);
@@ -108,6 +106,7 @@ private:
 
    bool              processRequestRefreshTrades(string &params[]);
    void              refreshTrades(void);
+
 public:
                      MTServer(ulong magic, int deviation);
    bool              start();
@@ -206,12 +205,12 @@ bool MTServer::startSockets(void)
 // Send responses to PULL_PORT that client is listening on.
    if(!pushSocket.bind(StringFormat("%s://%s:%d", ZEROMQ_PROTOCOL, HOSTNAME, PULL_PORT)))
      {
-      PrintFormat("[PUSH] ####ERROR#### Binding MTServer to Socket on Port %d",PULL_PORT);
+      PrintFormat("[PUSH] ####ERROR#### Binding MTServer to Socket on Port %d", PULL_PORT);
       return false;
      }
    else
      {
-      PrintFormat("[PUSH] Binding MTServer to Socket on Port %d",PULL_PORT);
+      PrintFormat("[PUSH] Binding MTServer to Socket on Port %d", PULL_PORT);
       pushSocket.setSendHighWaterMark(1);
       pushSocket.setLinger(0);
      }
@@ -219,12 +218,12 @@ bool MTServer::startSockets(void)
 // Receive commands from PUSH_PORT that client is sending to.
    if(!pullSocket.bind(StringFormat("%s://%s:%d", ZEROMQ_PROTOCOL, HOSTNAME, PUSH_PORT)))
      {
-      PrintFormat("[PULL] ####ERROR#### Binding MT4 Server to Socket on Port %d",PUSH_PORT);
+      PrintFormat("[PULL] ####ERROR#### Binding MT4 Server to Socket on Port %d", PUSH_PORT);
       return false;
      }
    else
      {
-      PrintFormat("[PULL] Binding MT4 Server to Socket on Port %d",PUSH_PORT);
+      PrintFormat("[PULL] Binding MT4 Server to Socket on Port %d", PUSH_PORT);
       pullSocket.setReceiveHighWaterMark(1);
       pullSocket.setLinger(0);
      }
@@ -232,12 +231,12 @@ bool MTServer::startSockets(void)
 // Send new market data to PUB_PORT that client is subscribed to.
    if(!pubSocket.bind(StringFormat("%s://%s:%d", ZEROMQ_PROTOCOL, HOSTNAME, PUB_PORT)))
      {
-      PrintFormat("[PUB] ####ERROR#### Binding MT4 Server to Socket on Port %s",PUB_PORT);
+      PrintFormat("[PUB] ####ERROR#### Binding MT4 Server to Socket on Port %s", PUB_PORT);
       return false;
      }
    else
      {
-      PrintFormat("[PUB] Binding MT4 Server to Socket on Port %d",PUB_PORT);
+      PrintFormat("[PUB] Binding MT4 Server to Socket on Port %d", PUB_PORT);
       pubSocket.setSendHighWaterMark(1);
       pubSocket.setLinger(0);
      }
@@ -282,7 +281,7 @@ bool MTServer::status(void)
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-bool MTServer::reply(Socket& socket, string message)
+bool MTServer::reply(Socket &socket, string message)
   {
    Print("Reply: " + message);
    ZmqMsg msg(message);
@@ -376,7 +375,7 @@ void MTServer::checkRequest()
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-void MTServer::parseRequest(string& message, string& result[])
+void MTServer::parseRequest(string &message, string &result[])
   {
    Print("Request: " + message);
    ushort separator = StringGetCharacter(";", 0);
@@ -446,7 +445,7 @@ bool MTServer::processRequest(string &params[])
       return this.processRequestCancelOrder(params);
 
    if(action == "TRADES")
-      return  this.processRequestTrades(params);
+      return this.processRequestTrades(params);
    if(action == "MODIFY_TRADE")
       return this.processRequestModifyTrade(params);
    if(action == "CLOSE_TRADE")
@@ -726,11 +725,11 @@ void MTServer::refreshTrades(void)
 
 // History orders
    string historyOrders = "HISTORY_ORDERS ";
-   this.account.getHistoryOrders(historyOrders, "", this.tradeRefreshStart, now+1);
+   this.account.getHistoryOrders(historyOrders, "", this.tradeRefreshStart, now + 1);
 
 // History deals
    string historyDeals = "HISTORY_DEALS ";
-   this.account.getHistoryDeals(historyDeals, "", this.tradeRefreshStart, now+1);
+   this.account.getHistoryDeals(historyDeals, "", this.tradeRefreshStart, now + 1);
 
 // Open orders
    string orders = "ORDERS ";

@@ -3,7 +3,7 @@
 //|                                      Copyright 2018, CompanyName |
 //|                                       http://www.companyname.net |
 //+------------------------------------------------------------------+
-#include  "Helper.mqh"
+#include "Helper.mqh"
 
 #ifdef __MQL5__
 #include <Trade\Trade.mqh>
@@ -84,14 +84,14 @@ bool MTAccount::getFund(string &result)
 //+------------------------------------------------------------------+
 //| ORDERS                                                           |
 //+------------------------------------------------------------------+
-bool MTAccount::getOrders(string &result, string symbol="")
+bool MTAccount::getOrders(string &result, string symbol = "")
   {
    int total = OrdersTotal();
    if(total == 0)
       return true;
 
 // loop
-   for(int i = total - 1; i >=0 ; i--)
+   for(int i = total - 1; i >= 0; i--)
      {
 
 #ifdef __MQL4__
@@ -211,7 +211,7 @@ bool MTAccount::cancelOrder(ulong ticket, string &result)
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-bool MTAccount::parseOrder(string &result, bool suffix=false)
+bool MTAccount::parseOrder(string &result, bool suffix = false)
   {
 #ifdef __MQL4__
    ulong ticket = OrderTicket();
@@ -222,8 +222,8 @@ bool MTAccount::parseOrder(string &result, bool suffix=false)
    double lots = OrderLots();
    double sl = OrderStopLoss();
    double tp = OrderTakeProfit();
-   long expiration= OrderExpiration();
-   string comment= OrderComment();
+   long expiration = OrderExpiration();
+   string comment = OrderComment();
 #endif
 #ifdef __MQL5__
    ulong ticket = OrderGetInteger(ORDER_TICKET);
@@ -236,8 +236,8 @@ bool MTAccount::parseOrder(string &result, bool suffix=false)
    double lots = OrderGetDouble(ORDER_VOLUME_INITIAL);
    double sl = OrderGetDouble(ORDER_SL);
    double tp = OrderGetDouble(ORDER_TP);
-   long expiration= OrderGetInteger(ORDER_TIME_EXPIRATION);
-   string comment= OrderGetString(ORDER_COMMENT);
+   long expiration = OrderGetInteger(ORDER_TIME_EXPIRATION);
+   string comment = OrderGetString(ORDER_COMMENT);
    long closeTime = OrderGetInteger(ORDER_TIME_DONE);
 #endif
 
@@ -262,7 +262,7 @@ bool MTAccount::parseOrder(string &result, bool suffix=false)
 //+------------------------------------------------------------------+
 //| HISTORY ORDERS                                                   |
 //+------------------------------------------------------------------+
-bool MTAccount::getHistoryOrders(string &result, string symbol="", datetime fromDate=0, datetime toDate=0)
+bool MTAccount::getHistoryOrders(string &result, string symbol = "", datetime fromDate = 0, datetime toDate = 0)
   {
    if(toDate == 0)
       toDate = TimeCurrent();
@@ -280,7 +280,7 @@ bool MTAccount::getHistoryOrders(string &result, string symbol="", datetime from
       return true;
 
 // loop
-   for(int i = total - 1; i >=0 ; i--)
+   for(int i = total - 1; i >= 0; i--)
      {
 
 #ifdef __MQL4__
@@ -327,8 +327,8 @@ bool MTAccount::parseHistoryOrder(ulong ticket, string &result, bool suffix = fa
    double lots = OrderLots();
    double sl = OrderStopLoss();
    double tp = OrderTakeProfit();
-   long expiration= OrderExpiration();
-   string comment= OrderComment();
+   long expiration = OrderExpiration();
+   string comment = OrderComment();
 #endif
 #ifdef __MQL5__
    ulong position = HistoryOrderGetInteger(ticket, ORDER_POSITION_ID);
@@ -340,8 +340,8 @@ bool MTAccount::parseHistoryOrder(ulong ticket, string &result, bool suffix = fa
    double lots = HistoryOrderGetDouble(ticket, ORDER_VOLUME_INITIAL);
    double sl = HistoryOrderGetDouble(ticket, ORDER_SL);
    double tp = HistoryOrderGetDouble(ticket, ORDER_TP);
-   long expiration= HistoryOrderGetInteger(ticket, ORDER_TIME_EXPIRATION);
-   string comment= HistoryOrderGetString(ticket, ORDER_COMMENT);
+   long expiration = HistoryOrderGetInteger(ticket, ORDER_TIME_EXPIRATION);
+   string comment = HistoryOrderGetString(ticket, ORDER_COMMENT);
    long closeTime = HistoryOrderGetInteger(ticket, ORDER_TIME_DONE);
 #endif
 
@@ -365,7 +365,7 @@ bool MTAccount::parseHistoryOrder(ulong ticket, string &result, bool suffix = fa
 //+------------------------------------------------------------------+
 //| HISTORY DEALS                                                    |
 //+------------------------------------------------------------------+
-bool MTAccount::getHistoryDeals(string &result, string symbol="", datetime fromDate=0, datetime toDate=0)
+bool MTAccount::getHistoryDeals(string &result, string symbol = "", datetime fromDate = 0, datetime toDate = 0)
   {
    if(toDate == 0)
       toDate = TimeCurrent();
@@ -383,7 +383,7 @@ bool MTAccount::getHistoryDeals(string &result, string symbol="", datetime fromD
       return true;
 
 // loop
-   for(int i = total - 1; i >=0 ; i--)
+   for(int i = total - 1; i >= 0; i--)
      {
 
 #ifdef __MQL4__
@@ -480,7 +480,7 @@ bool MTAccount::closePartialTrade(ulong ticket, double lots, double price, strin
 //+------------------------------------------------------------------+
 //| TRADES                                                           |
 //+------------------------------------------------------------------+
-bool MTAccount::getTrades(string &result, string symbol="")
+bool MTAccount::getTrades(string &result, string symbol = "")
   {
 #ifdef __MQL4__
    int modes[] = {OP_BUY, OP_SELL};
@@ -504,7 +504,6 @@ bool MTAccount::getTrades(string &result, string symbol="")
 
    return true;
 #endif
-
   }
 
 //+------------------------------------------------------------------+
@@ -557,7 +556,7 @@ bool MTAccount::closeTrade(ulong ticket, string &result)
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-bool MTAccount::parseTrade(string &result, bool suffix=false)
+bool MTAccount::parseTrade(string &result, bool suffix = false)
   {
 #ifdef __MQL4__
 #endif

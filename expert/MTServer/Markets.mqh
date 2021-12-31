@@ -4,7 +4,7 @@
 //|                                       http://www.companyname.net |
 //+------------------------------------------------------------------+
 
-#include  "Helper.mqh"
+#include "Helper.mqh"
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
@@ -15,7 +15,7 @@ protected:
    ENUM_TIMEFRAMES   timeframe;
 
 public:
-   string            getSymbol()    { return symbol; }
+   string            getSymbol() { return symbol; }
    ENUM_TIMEFRAMES   getTimeframe() { return timeframe; }
 
    void              Instrument()
@@ -35,7 +35,7 @@ public:
       return this.symbol == arg_symbol && this.timeframe == arg_timeframe;
      }
 
-   int               GetRates(MqlRates& rates[], int count)
+   int               GetRates(MqlRates &rates[], int count)
      {
       if(StringLen(symbol) == 0)
          return 0;
@@ -43,7 +43,6 @@ public:
       return CopyRates(symbol, timeframe, 0, count, rates);
      }
   };
-
 
 //+------------------------------------------------------------------+
 //|                                                                  |
@@ -55,7 +54,7 @@ private:
    string            symbols[];
    Instrument        instruments[];
 
-   void              parseRate(MqlRates& rate, string &result);
+   void              parseRate(MqlRates &rate, string &result);
    void              parseMarket(string symbol, string &result);
    void              parseQuote(string symbol, string &result);
 
@@ -98,7 +97,7 @@ bool MTMarkets::getMarkets(string &result)
    if(total == 0)
       return true;
 
-   for(int i = 0; i< total; i++)
+   for(int i = 0; i < total; i++)
      {
       string symbol = SymbolName(i, false);
       this.parseMarket(symbol, result);
@@ -106,7 +105,7 @@ bool MTMarkets::getMarkets(string &result)
 
    if(total > 0)
      {
-      result = StringSubstr(result, 0, StringLen(result)-1);
+      result = StringSubstr(result, 0, StringLen(result) - 1);
      }
    return true;
   }
@@ -127,8 +126,7 @@ void MTMarkets::parseMarket(string symbol, string &result)
                                 MarketInfo(symbol, MODE_LOTSTEP),
                                 MarketInfo(symbol, MODE_MAXLOT),
                                 MarketInfo(symbol, MODE_TICKSIZE),
-                                TimeGMTOffset()
-                               );
+                                TimeGMTOffset());
 #endif
 #ifdef __MQL5__
    string market = StringFormat("%s|%s|%s|%g|%g|%g|%g|%g|%g|%g;",
@@ -141,8 +139,7 @@ void MTMarkets::parseMarket(string symbol, string &result)
                                 SymbolInfoDouble(symbol, SYMBOL_VOLUME_STEP),
                                 SymbolInfoDouble(symbol, SYMBOL_VOLUME_MAX),
                                 SymbolInfoDouble(symbol, SYMBOL_TRADE_TICK_SIZE),
-                                TimeGMTOffset()
-                               );
+                                TimeGMTOffset());
 #endif
 
    StringAdd(result, market);
@@ -162,14 +159,14 @@ bool MTMarkets::getBars(string symbol, ENUM_TIMEFRAMES period, datetime startTim
 // Handling ERR_HISTORY_WILL_UPDATED (4066) and ERR_NO_HISTORY_DATA (4073) errors.
 // For non-chart symbols and time frames MT4 often needs a few requests until the data is available.
 // But even after 10 requests it can happen that it is not available. So it is best to have the charts open.
-   for(int i=0; i<5; i++)
+   for(int i = 0; i < 5; i++)
      {
       ratesCount = CopyRates(symbol, period, startTime, endTime, rates);
       int errorCode = GetLastError();
       if(errorCode != 0)
          PrintFormat("getBars error [%d]: %s", errorCode, ErrorDescription(errorCode));
 
-      if(ratesCount > 0 && rates[ratesCount-1].time > endTime - period*60)
+      if(ratesCount > 0 && rates[ratesCount - 1].time > endTime - period * 60)
          break;
 
       Sleep(200);
@@ -187,7 +184,7 @@ bool MTMarkets::getBars(string symbol, ENUM_TIMEFRAMES period, datetime startTim
 
    if(ratesCount > 0)
      {
-      result = StringSubstr(result, 0, StringLen(result)-1);
+      result = StringSubstr(result, 0, StringLen(result) - 1);
      }
    return true;
   }
@@ -204,7 +201,7 @@ bool MTMarkets::subscribeBar(string symbol, ENUM_TIMEFRAMES period)
          return true;
      }
 
-   ArrayResize(this.instruments, size +1);
+   ArrayResize(this.instruments, size + 1);
    this.instruments[size].setup(symbol, period);
    return true;
   }
@@ -229,14 +226,14 @@ bool MTMarkets::unsubscribeBar(string symbol, ENUM_TIMEFRAMES period)
       // find instrument
       if(instrument.equal(symbol, period))
         {
-         shift= true;
+         shift = true;
          continue;
         }
      }
 
    if(shift)
      {
-      ArrayResize(this.instruments, size -1);
+      ArrayResize(this.instruments, size - 1);
      }
    return true;
   }
@@ -275,7 +272,7 @@ bool MTMarkets::getLastBars(string &result)
 
    if(size > 0)
      {
-      result = StringSubstr(result, 0, StringLen(result)-1);
+      result = StringSubstr(result, 0, StringLen(result) - 1);
      }
    return true;
   }
@@ -283,7 +280,7 @@ bool MTMarkets::getLastBars(string &result)
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-void MTMarkets::parseRate(MqlRates& rate, string &result)
+void MTMarkets::parseRate(MqlRates &rate, string &result)
   {
    StringAdd(result, StringFormat("%f|%g|%g|%g|%g|%g|%g|%g;",
                                   rate.time,
@@ -309,7 +306,7 @@ bool MTMarkets::getQuotes(string &result)
    if(total == 0)
       return true;
 
-   for(int i = 0; i< total; i++)
+   for(int i = 0; i < total; i++)
      {
       string symbol = SymbolName(i, true);
       this.parseQuote(symbol, result);
@@ -317,7 +314,7 @@ bool MTMarkets::getQuotes(string &result)
 
    if(total > 0)
      {
-      result = StringSubstr(result, 0, StringLen(result)-1);
+      result = StringSubstr(result, 0, StringLen(result) - 1);
      }
    return true;
   }
@@ -334,7 +331,7 @@ bool MTMarkets::subscribeQuote(string symbol)
          return true;
      }
 
-   ArrayResize(this.symbols, size +1);
+   ArrayResize(this.symbols, size + 1);
    this.symbols[size] = symbol;
    return true;
   }
@@ -380,7 +377,7 @@ bool MTMarkets::getLastQuotes(string &result)
 
    if(size > 0)
      {
-      result = StringSubstr(result, 0, StringLen(result)-1);
+      result = StringSubstr(result, 0, StringLen(result) - 1);
      }
    return true;
   }
@@ -409,7 +406,7 @@ void MTMarkets::parseQuote(string symbol, string &result)
    double low = iLow(symbol, PERIOD_D1, 0);
    double close = iClose(symbol, PERIOD_D1, 0);
    long volume = iVolume(symbol, PERIOD_D1, 0);
-   
+
 // bypass: skip download bar data if missing data
    ResetLastError();
 
@@ -417,14 +414,13 @@ void MTMarkets::parseQuote(string symbol, string &result)
    double change = close - prevClose;
    double changePercent = 0;
    if(prevClose > 0)
-      changePercent = (close - prevClose)/prevClose*100;
+      changePercent = (close - prevClose) / prevClose * 100;
 
 // SYMBOL|OPEN|HIGH|LOW|CLOSE|VOLUME|BID|ASK|LAST|SPREAD|PREV_CLOSE|CHANGE|CHANGE_PERCENT
    StringAdd(result, StringFormat("%s|%g|%g|%g|%g|%g|%g|%g|%g|%g|%g|%g|%g;",
                                   symbol,
                                   open, high, low, close, volume,
                                   bid, ask, last, spread,
-                                  prevClose, change, changePercent
-                                 ));
+                                  prevClose, change, changePercent));
   }
 //+------------------------------------------------------------------+
