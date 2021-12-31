@@ -57,6 +57,7 @@ private:
    MTMarkets         *markets;
    MTAccount         *account;
    datetime          pingExpire;
+   datetime          flushSubscribersAt;
    datetime          tradeRefreshStart;
    datetime          tradeRefreshAt;
 
@@ -67,6 +68,7 @@ private:
 
    // subscribers
    void              checkSubscribers();
+   void              flushSubscribers();
    void              clearSubscribers();
    bool              processSubBars();
    bool              processSubQuotes();
@@ -131,7 +133,7 @@ void MTServer::MTServer(ulong magic, int deviation)
    this.account = new MTAccount(magic, deviation);
 
    this.pingExpire = TimeCurrent() + 30; // expire at next 30 seconds
-
+   this.flushSubscribersAt = 0;
    this.tradeRefreshAt = 0;
    this.tradeRefreshStart = this.account.getOrdersMinTime();
    if(this.tradeRefreshStart == 0)// 0 equal no order
@@ -179,7 +181,7 @@ void MTServer::onTick(void)
       return;
      }
 
-   this.checkSubscribers();
+   this.flushSubscribers();
   }
 //+------------------------------------------------------------------+
 //|                                                                  |
@@ -187,6 +189,7 @@ void MTServer::onTick(void)
 void MTServer::onTimer(void)
   {
    this.checkRequest();
+   this.checkSubscribers();
    this.checkRefreshTrades();
   }
 //+------------------------------------------------------------------+
@@ -293,9 +296,21 @@ bool MTServer::reply(Socket &socket, string message)
   }
 
 //+------------------------------------------------------------------+
-//|                                                                  |
+//| SUBSCRIBERS                                                      |
 //+------------------------------------------------------------------+
 void MTServer::checkSubscribers()
+  {
+   if(this.flushSubscribersAt > TimeCurrent())
+      return;
+
+   this.flushSubscribers();
+   this.flushSubscribersAt = TimeCurrent() + 1; // flush every 1 seconds
+  }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+void MTServer::flushSubscribers()
   {
    this.processSubBars();
    this.processSubQuotes();
@@ -462,7 +477,7 @@ bool MTServer::processRequest(string &params[])
   }
 
 //+------------------------------------------------------------------+
-//|                                                                  |
+//|  PING                                                            |
 //+------------------------------------------------------------------+
 bool MTServer::processRequestPing(string &params[])
   {
@@ -472,7 +487,7 @@ bool MTServer::processRequestPing(string &params[])
   }
 
 //+------------------------------------------------------------------+
-//|                                                                  |
+//| MARKET BARS                                                      |
 //+------------------------------------------------------------------+
 bool MTServer::processRequestBars(string &params[])
   {
@@ -512,7 +527,7 @@ bool MTServer::processRequestUnsubBars(string &params[])
   }
 
 //+------------------------------------------------------------------+
-//|                                                                  |
+//| MARKET QUOTES                                                    |
 //+------------------------------------------------------------------+
 bool MTServer::processRequestQuotes(string &params[])
   {
@@ -546,7 +561,7 @@ bool MTServer::processRequestUnsubQuotes(string &params[])
   }
 
 //+------------------------------------------------------------------+
-//|                                                                  |
+//| MARKET TIME                                                      |
 //+------------------------------------------------------------------+
 bool MTServer::processRequestTime(string &params[])
   {
@@ -555,7 +570,7 @@ bool MTServer::processRequestTime(string &params[])
   }
 
 //+------------------------------------------------------------------+
-//|                                                                  |
+//| MARKETS                                                          |
 //+------------------------------------------------------------------+
 bool MTServer::processRequestMarkets(string &params[])
   {
