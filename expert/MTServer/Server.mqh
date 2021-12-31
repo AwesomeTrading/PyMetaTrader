@@ -481,8 +481,8 @@ bool MTServer::processRequestBars(string &params[])
   {
    string symbol = params[2];
    ENUM_TIMEFRAMES period = GetTimeframe(params[3]);
-   datetime startTime = TimestampToTime(params[4]);
-   datetime endTime = TimestampToTime(params[5]);
+   datetime startTime = TimestampToGMTTime(params[4]);
+   datetime endTime = TimestampToGMTTime(params[5]);
 
    string result = "";
    this.markets.getBars(symbol, period, startTime, endTime, result);
