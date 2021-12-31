@@ -57,7 +57,6 @@ private:
    MTMarkets         *markets;
    MTAccount         *account;
    datetime          pingExpire;
-   datetime          tradeRefreshFrom;
    datetime          tradeRefreshStart;
    datetime          tradeRefreshAt;
 
@@ -132,12 +131,10 @@ void MTServer::MTServer(ulong magic, int deviation)
    this.account = new MTAccount(magic, deviation);
 
    this.pingExpire = TimeCurrent() + 30; // expire at next 30 seconds
-   this.tradeRefreshFrom = TimeCurrent();
 
-// 0 equal no order
    this.tradeRefreshAt = 0;
    this.tradeRefreshStart = this.account.getOrdersMinTime();
-   if(this.tradeRefreshStart == 0)
+   if(this.tradeRefreshStart == 0)// 0 equal no order
       this.tradeRefreshStart = TimeCurrent();
   }
 //+------------------------------------------------------------------+
@@ -287,7 +284,7 @@ bool MTServer::status(void)
 //+------------------------------------------------------------------+
 bool MTServer::reply(Socket &socket, string message)
   {
-   Print("Reply: " + message);
+   Print("<- Reply: " + message);
    ZmqMsg msg(message);
    bool ok = socket.send(msg, true); // NON-BLOCKING
    if(!ok)
@@ -381,7 +378,7 @@ void MTServer::checkRequest()
 //+------------------------------------------------------------------+
 void MTServer::parseRequest(string &message, string &result[])
   {
-   Print("Request: " + message);
+   Print("-> Request: " + message);
    ushort separator = StringGetCharacter(";", 0);
    int splits = StringSplit(message, separator, result);
   }
@@ -746,11 +743,7 @@ void MTServer::checkRefreshTrades(void)
 void MTServer::doRefreshTrades(void)
   {
    datetime now = TimeCurrent();
-   if(now <= this.tradeRefreshFrom)
-     {
-      Print("Skip refresh trades at: ", now);
-      return;
-     }
+
 // History orders
    string historyOrders = "HISTORY_ORDERS ";
    this.account.getHistoryOrders(historyOrders, "", this.tradeRefreshStart, now + 1);
@@ -771,7 +764,6 @@ void MTServer::doRefreshTrades(void)
    this.reply(pubSocket, refresh);
 
 // Refresh params
-   this.tradeRefreshFrom = now;
    this.tradeRefreshStart = this.account.getOrdersMinTime();
    if(this.tradeRefreshStart == 0)
       this.tradeRefreshStart = now;
