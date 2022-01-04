@@ -82,24 +82,16 @@ class MetaTrader():
         self.context.destroy(0)
 
     def _send(self, socket, data):
-        # if self._PUSH_SOCKET_STATUS['state'] == True:
         try:
             socket.send_string(data, zmq.DONTWAIT)
         except zmq.error.Again:
             print("Resource timeout.. please try again.")
-        # else:
-        #     print('\n[KERNEL] NO HANDSHAKE ON PUSH SOCKET.. Cannot SEND data')
 
     def _recv(self, socket) -> str:
-        # if self._PULL_SOCKET_STATUS['state'] == True:
         try:
             return socket.recv_string(zmq.DONTWAIT)
         except zmq.error.Again:
             print("Resource timeout.. please try again.")
-        # else:
-        #     print('\r[KERNEL] NO HANDSHAKE ON PULL SOCKET.. Cannot READ data', end='', flush=True)
-
-        return None
 
     ### PING
     def _t_ping(self):
