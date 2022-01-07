@@ -209,13 +209,6 @@ class MetaTrader():
         data = self._request_and_wait(self.push_socket, 'TIME')
         return float(data)
 
-    def _parse_fund(self, data):
-        raw = data.split('|')
-        return dict(
-            cash=float(raw[0]),
-            value=float(raw[1]),
-        )
-
     # bars
     def subscribe_bars(self, symbol, timeframe):
         symbol = self._parse_broker_symbol(symbol)
@@ -267,17 +260,22 @@ class MetaTrader():
         self.markets = {m['id']: m for m in markets}
         return markets
 
-    # SYMBOL|SYMBOL_DESCRIPTION|SYMBOL_CURRENCY_BASE|MODE_POINT|MODE_DIGITS|MODE_MINLOT|MODE_LOTSTEP|MODE_MAXLOT|MODE_TICKSIZE|TIME_GMTOFFSET
-    _market_keys = [['symbol', str], ['description', str], ['currency', str],
-                    ['point', float], ['digits', float], ['minlot', float],
-                    ['lotstep', float], ['maxlot', float], ['ticksize', float],
-                    ['gmt_offset', float]]
+    _market_format = dict(
+        point=float,
+        digits=float,
+        minlot=float,
+        lotstep=float,
+        maxlot=float,
+        lotsize=float,
+        ticksize=float,
+        tickvalue=float,
+        gmtoffset=float,
+    )
 
-    def _parse_market(self, data):
-        market = self._parse_data_by_keys(data, self._market_keys)
+    def _parse_market(self, raw):
+        market = self._parse_data_dict(raw, self._market_format)
         symbol = market['symbol']
         market['id'] = symbol
-
         # Transform EURUSD to EUR/USD
         if len(symbol) == 6 and (symbol.startswith(market['currency'])
                                  or symbol.endswith(market['currency'])):
@@ -304,15 +302,23 @@ class MetaTrader():
             quotes.append(self._parse_quote(raw))
         return quotes
 
-    # SYMBOL|OPEN|HIGH|LOW|CLOSE|VOLUME|BID|ASK|LAST|SPREAD|PREV_CLOSE|CHANGE|CHANGE_PERCENT
-    _quote_keys = [['symbol', str], ['open', float], ['high', float],
-                   ['low', float], ['close', float], ['volume', float],
-                   ['bid', float], ['ask', float], ['last', float],
-                   ['spread', float], ['prev_close', float], ['change', float],
-                   ['change_percent', float]]
+    _quote_format = dict(
+        open=float,
+        high=float,
+        low=float,
+        close=float,
+        volume=float,
+        bid=float,
+        ask=float,
+        last=float,
+        spread=float,
+        prev_close=float,
+        change=float,
+        change_percent=float,
+    )
 
-    def _parse_quote(self, data):
-        quote = self._parse_data_by_keys(data, self._quote_keys)
+    def _parse_quote(self, raw):
+        quote = self._parse_data_dict(raw, self._quote_format)
         quote['symbol'] = self._parse_api_symbol(quote['symbol'])
         return quote
 
@@ -327,10 +333,20 @@ class MetaTrader():
         return True
 
     ### ACCOUNT
-    # fund
-    def get_fund(self):
-        data = self._request_and_wait(self.push_socket, 'FUND')
-        return self._parse_fund(data)
+    # account
+    def get_account(self):
+        data = self._request_and_wait(self.push_socket, 'ACCOUNT')
+        return self._parse_account(data)
+
+    _account_format = dict(
+        balance=float,
+        equity=float,
+        leverage=int,
+    )
+
+    def _parse_account(self, raw):
+        account = self._parse_data_dict(raw, self._account_format)
+        return account
 
     # trades
     def get_trades(self, symbol=''):
@@ -470,22 +486,11 @@ class MetaTrader():
 
     def _parse_api_symbol(self, symbol: str):
         if len(self.markets) == 0:
-            return symbol[:3] + '/' + symbol[3:]
+            if len(symbol) == 6:
+                return symbol[:3] + '/' + symbol[3:]
+            else:
+                sleep(3)
         return self.markets[symbol]['symbol']
-
-    def _parse_data_by_keys(self, data, keys):
-        raw = data.split('|')
-        result = dict()
-        for i in range(0, len(keys)):
-            try:
-                key = keys[i][0]
-                type = keys[i][1]
-                result[key] = type(raw[i])
-            except:
-                raise RuntimeError(
-                    f"Cannot parse data {data} by key {key}, type {type} and value {raw[i]}"
-                )
-        return result
 
     def _parse_data_dict(self, data, format):
         raws = data.split('|')

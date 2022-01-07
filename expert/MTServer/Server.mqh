@@ -93,7 +93,7 @@ private:
    bool              processRequestMarkets(string &params[]);
 
    // account
-   bool              processRequestFund(string &params[]);
+   bool              processRequestAccount(string &params[]);
 
    bool              processRequestOrders(string &params[]);
    bool              processRequestOpenOrder(string &params[]);
@@ -448,8 +448,8 @@ bool MTServer::processRequest(string &params[])
       return this.processRequestTime(params);
 
 // account
-   if(action == "FUND")
-      return this.processRequestFund(params);
+   if(action == "ACCOUNT")
+      return this.processRequestAccount(params);
 
    if(action == "ORDERS")
       return this.processRequestOrders(params);
@@ -580,12 +580,12 @@ bool MTServer::processRequestMarkets(string &params[])
   }
 
 //+------------------------------------------------------------------+
-//| FUND                                                             |
+//| ACCOUNT                                                          |
 //+------------------------------------------------------------------+
-bool MTServer::processRequestFund(string &params[])
+bool MTServer::processRequestAccount(string &params[])
   {
    string result = "";
-   this.account.getFund(result);
+   this.account.getAccount(result);
    return this.requestReply(params[1], result);
   }
 

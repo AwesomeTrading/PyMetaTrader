@@ -25,7 +25,7 @@ private:
 
 public:
    void              MTAccount(ulong magic, int deviation);
-   bool              getFund(string &result);
+   bool              getAccount(string &result);
    // Order
    bool              getOrders(string &result, string symbol);
    bool              getOrder(ulong ticket, string &result);
@@ -69,16 +69,22 @@ void MTAccount::MTAccount(ulong magic, int deviation)
 //+------------------------------------------------------------------+
 //| ACCOUNT                                                          |
 //+------------------------------------------------------------------+
-bool MTAccount::getFund(string &result)
+bool MTAccount::getAccount(string &result)
   {
 #ifdef __MQL4__
-   string info = StringFormat("%g|%g", AccountBalance(), AccountEquity());
+   double balance = AccountBalance();
+   double equity = AccountEquity();
+   int leverage = AccountLeverage();
 #endif
-   string info = StringFormat("%g|%g", AccountInfoDouble(ACCOUNT_BALANCE), AccountInfoDouble(ACCOUNT_EQUITY));
 #ifdef __MQL5__
-
+   double balance = AccountInfoDouble(ACCOUNT_BALANCE);
+   double equity = AccountInfoDouble(ACCOUNT_EQUITY);
+   long leverage = AccountInfoInteger(ACCOUNT_LEVERAGE);
 #endif
-   StringAdd(result, info);
+
+   StringAdd(result, StringFormat("balance=%g", balance));
+   StringAdd(result, StringFormat("|equity=%g", equity));
+   StringAdd(result, StringFormat("|leverage=%d", leverage));
    return true;
   }
 //+------------------------------------------------------------------+

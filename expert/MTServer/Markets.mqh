@@ -83,8 +83,9 @@ public:
 void MTMarkets::MTMarkets()
   {
   }
+
 //+------------------------------------------------------------------+
-//|                                                                  |
+//| MARKETS                                                          |
 //+------------------------------------------------------------------+
 bool MTMarkets::getMarkets(string &result)
   {
@@ -109,41 +110,185 @@ bool MTMarkets::getMarkets(string &result)
 //+------------------------------------------------------------------+
 void MTMarkets::parseMarket(string symbol, string &result, bool suffix = false)
   {
-// SYMBOL|SYMBOL_DESCRIPTION|SYMBOL_CURRENCY_BASE|MODE_POINT|MODE_DIGITS|MODE_MINLOT|MODE_LOTSTEP|MODE_MAXLOT|MODE_TICKSIZE|TIME_GMTOFFSET
 #ifdef __MQL4__
-   StringAdd(result, StringFormat("%s|%s|%s|%g|%g|%g|%g|%g|%g|%g",
-                                  symbol,
-                                  SymbolInfoString(symbol, SYMBOL_DESCRIPTION),
-                                  SymbolInfoString(symbol, SYMBOL_CURRENCY_BASE),
-                                  MarketInfo(symbol, MODE_POINT),
-                                  MarketInfo(symbol, MODE_DIGITS),
-                                  MarketInfo(symbol, MODE_MINLOT),
-                                  MarketInfo(symbol, MODE_LOTSTEP),
-                                  MarketInfo(symbol, MODE_MAXLOT),
-                                  MarketInfo(symbol, MODE_TICKSIZE),
-                                  TimeGMTOffset()));
+   string description = SymbolInfoString(symbol, SYMBOL_DESCRIPTION);
+   string currency =  SymbolInfoString(symbol, SYMBOL_CURRENCY_BASE);
+   double point = MarketInfo(symbol, MODE_POINT);
+   double digits = MarketInfo(symbol, MODE_DIGITS);
+   double minlot = MarketInfo(symbol, MODE_MINLOT);
+   double lotstep = MarketInfo(symbol, MODE_LOTSTEP);
+   double maxlot = MarketInfo(symbol, MODE_MAXLOT);
+   double lotsize = MarketInfo(symbol, MODE_LOTSIZE);
+   double ticksize = MarketInfo(symbol, MODE_TICKSIZE);
+   double tickvalue = MarketInfo(symbol, MODE_TICKVALUE);
+   double gmtoffset = TimeGMTOffset();
+
 // bypass: error when get MarketInfo with symbol not in MarketWatch
    GetLastError();
 #endif
 #ifdef __MQL5__
-   StringAdd(result, StringFormat("%s|%s|%s|%g|%g|%g|%g|%g|%g|%g",
-                                  symbol,
-                                  SymbolInfoString(symbol, SYMBOL_DESCRIPTION),
-                                  SymbolInfoString(symbol, SYMBOL_CURRENCY_BASE),
-                                  SymbolInfoDouble(symbol, SYMBOL_POINT),
-                                  SymbolInfoInteger(symbol, SYMBOL_DIGITS),
-                                  SymbolInfoDouble(symbol, SYMBOL_VOLUME_MIN),
-                                  SymbolInfoDouble(symbol, SYMBOL_VOLUME_STEP),
-                                  SymbolInfoDouble(symbol, SYMBOL_VOLUME_MAX),
-                                  SymbolInfoDouble(symbol, SYMBOL_TRADE_TICK_SIZE),
-                                  TimeGMTOffset()));
+   string description = SymbolInfoString(symbol, SYMBOL_DESCRIPTION);
+   string currency =  SymbolInfoString(symbol, SYMBOL_CURRENCY_BASE);
+   double point = SymbolInfoDouble(symbol, SYMBOL_POINT);
+   long digits = SymbolInfoInteger(symbol, SYMBOL_DIGITS);
+   double minlot = SymbolInfoDouble(symbol, SYMBOL_VOLUME_MIN);
+   double lotstep = SymbolInfoDouble(symbol, SYMBOL_VOLUME_STEP);
+   double maxlot = SymbolInfoDouble(symbol, SYMBOL_VOLUME_MAX);
+   double lotsize = SymbolInfoDouble(symbol, SYMBOL_TRADE_CONTRACT_SIZE);
+   double ticksize = SymbolInfoDouble(symbol, SYMBOL_TRADE_TICK_SIZE);
+   double tickvalue = SymbolInfoDouble(symbol, SYMBOL_TRADE_TICK_VALUE);
+   double gmtoffset = TimeGMTOffset();
 #endif
+
+   StringAdd(result, StringFormat("symbol=%s", symbol));
+   StringAdd(result, StringFormat("|description=%s", description));
+   StringAdd(result, StringFormat("|currency=%s", currency));
+   StringAdd(result, StringFormat("|point=%g", point));
+   StringAdd(result, StringFormat("|digits=%g", digits));
+   StringAdd(result, StringFormat("|minlot=%g", minlot));
+   StringAdd(result, StringFormat("|lotstep=%g", lotstep));
+   StringAdd(result, StringFormat("|maxlot=%g", maxlot));
+   StringAdd(result, StringFormat("|lotsize=%g", lotsize));
+   StringAdd(result, StringFormat("|ticksize=%g", ticksize));
+   StringAdd(result, StringFormat("|tickvalue=%g", tickvalue));
+   StringAdd(result, StringFormat("|gmtoffset=%g", gmtoffset));
+   if(suffix)
+      StringAdd(result, ";");
+  }
+
+//+------------------------------------------------------------------+
+//| QUOTES                                                           |
+//+------------------------------------------------------------------+
+bool MTMarkets::getQuotes(string &result)
+  {
+#ifdef __MQL4__
+   RefreshRates();
+#endif
+
+   int total = SymbolsTotal(true);
+   if(total == 0)
+      return true;
+
+   for(int i = total - 1; i >= 0; i--)
+     {
+      string symbol = SymbolName(i, true);
+      this.parseQuote(symbol, result, i > 0);
+     }
+   return true;
+  }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+bool MTMarkets::subscribeQuote(string symbol)
+  {
+   int size = ArraySize(this.symbols);
+   for(int i = 0; i < size; i++)
+     {
+      if(this.symbols[i] == symbol)
+         return true;
+     }
+
+   ArrayResize(this.symbols, size + 1);
+   this.symbols[size] = symbol;
+   return true;
+  }
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+bool MTMarkets::unsubscribeQuote(string symbol)
+  {
+   ArrayRemove(this.symbols, symbol);
+   return true;
+  }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+bool MTMarkets::hasQuoteSubscribers(void)
+  {
+   return ArraySize(this.symbols) > 0;
+  }
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+void MTMarkets::clearQuoteSubscribers(void)
+  {
+   ArrayResize(this.symbols, 0);
+  }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+bool MTMarkets::getLastQuotes(string &result)
+  {
+#ifdef __MQL4__
+   RefreshRates();
+#endif
+
+   int total = ArraySize(this.symbols);
+   for(int i = total - 1; i >= 0; i--)
+     {
+      string symbol = this.symbols[i];
+      this.parseQuote(symbol, result, i > 0);
+     }
+   return true;
+  }
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+void MTMarkets::parseQuote(string symbol, string &result, bool suffix = false)
+  {
+#ifdef __MQL4__
+   double bid = MarketInfo(symbol, MODE_BID);
+   double ask = MarketInfo(symbol, MODE_ASK);
+   double spread = MarketInfo(symbol, MODE_SPREAD);
+#endif
+#ifdef __MQL5__
+   MqlTick lastTick;
+   SymbolInfoTick(symbol, lastTick);
+
+   double bid = lastTick.bid;
+   double ask = lastTick.ask;
+   double spread = (double)SymbolInfoInteger(symbol, SYMBOL_SPREAD);
+#endif
+
+   double last = NormalizeDouble((bid + ask) / 2, Digits());
+   double open = iOpen(symbol, PERIOD_D1, 0);
+   double high = iHigh(symbol, PERIOD_D1, 0);
+   double low = iLow(symbol, PERIOD_D1, 0);
+   double close = iClose(symbol, PERIOD_D1, 0);
+   long volume = iVolume(symbol, PERIOD_D1, 0);
+
+// bypass: skip download bar data if missing data
+   ResetLastError();
+
+   double prevClose = iClose(symbol, PERIOD_D1, 1);
+   double change = close - prevClose;
+   double changePercent = 0;
+   if(prevClose > 0)
+      changePercent = (close - prevClose) / prevClose * 100;
+
+   StringAdd(result, StringFormat("symbol=%s", symbol));
+   StringAdd(result, StringFormat("|open=%g", open));
+   StringAdd(result, StringFormat("|high=%g", high));
+   StringAdd(result, StringFormat("|low=%g", low));
+   StringAdd(result, StringFormat("|close=%g", close));
+   StringAdd(result, StringFormat("|volume=%g", volume));
+   StringAdd(result, StringFormat("|bid=%g", bid));
+   StringAdd(result, StringFormat("|ask=%g", ask));
+   StringAdd(result, StringFormat("|last=%g", last));
+   StringAdd(result, StringFormat("|spread=%g", spread));
+   StringAdd(result, StringFormat("|prev_close=%g", prevClose));
+   StringAdd(result, StringFormat("|change=%g", change));
+   StringAdd(result, StringFormat("|change_percent=%g", changePercent));
 
    if(suffix)
       StringAdd(result, ";");
   }
+
 //+------------------------------------------------------------------+
-//|                                                                  |
+//| BARS                                                             |
 //+------------------------------------------------------------------+
 bool MTMarkets::getBars(string symbol, ENUM_TIMEFRAMES period, datetime startTime, datetime endTime, string &result)
   {
@@ -277,129 +422,6 @@ void MTMarkets::parseRate(MqlRates &rate, string &result, bool suffix = false)
                                   rate.tick_volume,
                                   rate.spread,
                                   rate.real_volume));
-   if(suffix)
-      StringAdd(result, ";");
-  }
-
-//+------------------------------------------------------------------+
-//|                                                                  |
-//+------------------------------------------------------------------+
-bool MTMarkets::getQuotes(string &result)
-  {
-#ifdef __MQL4__
-   RefreshRates();
-#endif
-
-   int total = SymbolsTotal(true);
-   if(total == 0)
-      return true;
-
-   for(int i = total - 1; i >= 0; i--)
-     {
-      string symbol = SymbolName(i, true);
-      this.parseQuote(symbol, result, i > 0);
-     }
-   return true;
-  }
-
-//+------------------------------------------------------------------+
-//|                                                                  |
-//+------------------------------------------------------------------+
-bool MTMarkets::subscribeQuote(string symbol)
-  {
-   int size = ArraySize(this.symbols);
-   for(int i = 0; i < size; i++)
-     {
-      if(this.symbols[i] == symbol)
-         return true;
-     }
-
-   ArrayResize(this.symbols, size + 1);
-   this.symbols[size] = symbol;
-   return true;
-  }
-//+------------------------------------------------------------------+
-//|                                                                  |
-//+------------------------------------------------------------------+
-bool MTMarkets::unsubscribeQuote(string symbol)
-  {
-   ArrayRemove(this.symbols, symbol);
-   return true;
-  }
-
-//+------------------------------------------------------------------+
-//|                                                                  |
-//+------------------------------------------------------------------+
-bool MTMarkets::hasQuoteSubscribers(void)
-  {
-   return ArraySize(this.symbols) > 0;
-  }
-//+------------------------------------------------------------------+
-//|                                                                  |
-//+------------------------------------------------------------------+
-void MTMarkets::clearQuoteSubscribers(void)
-  {
-   ArrayResize(this.symbols, 0);
-  }
-
-//+------------------------------------------------------------------+
-//|                                                                  |
-//+------------------------------------------------------------------+
-bool MTMarkets::getLastQuotes(string &result)
-  {
-#ifdef __MQL4__
-   RefreshRates();
-#endif
-
-   int total = ArraySize(this.symbols);
-   for(int i = total - 1; i >= 0; i--)
-     {
-      string symbol = this.symbols[i];
-      this.parseQuote(symbol, result, i > 0);
-     }
-   return true;
-  }
-//+------------------------------------------------------------------+
-//|                                                                  |
-//+------------------------------------------------------------------+
-void MTMarkets::parseQuote(string symbol, string &result, bool suffix = false)
-  {
-#ifdef __MQL4__
-   double bid = MarketInfo(symbol, MODE_BID);
-   double ask = MarketInfo(symbol, MODE_ASK);
-   double spread = MarketInfo(symbol, MODE_SPREAD);
-#endif
-#ifdef __MQL5__
-   MqlTick lastTick;
-   SymbolInfoTick(symbol, lastTick);
-
-   double bid = lastTick.bid;
-   double ask = lastTick.ask;
-   double spread = (double)SymbolInfoInteger(symbol, SYMBOL_SPREAD);
-#endif
-
-   double last = NormalizeDouble((bid + ask) / 2, Digits());
-   double open = iOpen(symbol, PERIOD_D1, 0);
-   double high = iHigh(symbol, PERIOD_D1, 0);
-   double low = iLow(symbol, PERIOD_D1, 0);
-   double close = iClose(symbol, PERIOD_D1, 0);
-   long volume = iVolume(symbol, PERIOD_D1, 0);
-
-// bypass: skip download bar data if missing data
-   ResetLastError();
-
-   double prevClose = iClose(symbol, PERIOD_D1, 1);
-   double change = close - prevClose;
-   double changePercent = 0;
-   if(prevClose > 0)
-      changePercent = (close - prevClose) / prevClose * 100;
-
-// SYMBOL|OPEN|HIGH|LOW|CLOSE|VOLUME|BID|ASK|LAST|SPREAD|PREV_CLOSE|CHANGE|CHANGE_PERCENT
-   StringAdd(result, StringFormat("%s|%g|%g|%g|%g|%g|%g|%g|%g|%g|%g|%g|%g",
-                                  symbol,
-                                  open, high, low, close, volume,
-                                  bid, ask, last, spread,
-                                  prevClose, change, changePercent));
    if(suffix)
       StringAdd(result, ";");
   }
