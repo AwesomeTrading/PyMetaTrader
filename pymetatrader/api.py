@@ -339,14 +339,26 @@ class MetaTrader():
         return self._parse_account(data)
 
     _account_format = dict(
-        balance=float,
-        equity=float,
+        id=int,
         leverage=int,
     )
 
     def _parse_account(self, raw):
-        account = self._parse_data_dict(raw, self._account_format)
-        return account
+        return self._parse_data_dict(raw, self._account_format)
+
+    # fund
+    def get_fund(self):
+        data = self._request_and_wait(self.push_socket, 'FUND')
+        return self._parse_fund(data)
+
+    _fund_format = dict(
+        balance=float,
+        equity=float,
+    )
+
+    def _parse_fund(self, raw):
+        fund = self._parse_data_dict(raw, self._fund_format)
+        return fund
 
     # trades
     def get_trades(self, symbol=''):
@@ -486,10 +498,7 @@ class MetaTrader():
 
     def _parse_api_symbol(self, symbol: str):
         if len(self.markets) == 0:
-            if len(symbol) == 6:
-                return symbol[:3] + '/' + symbol[3:]
-            else:
-                sleep(3)
+            return symbol[:3] + '/' + symbol[3:]
         return self.markets[symbol]['symbol']
 
     def _parse_data_dict(self, data, format):

@@ -26,6 +26,7 @@ private:
 public:
    void              MTAccount(ulong magic, int deviation);
    bool              getAccount(string &result);
+   bool              getFund(string &result);
    // Order
    bool              getOrders(string &result, string symbol);
    bool              getOrder(ulong ticket, string &result);
@@ -72,19 +73,46 @@ void MTAccount::MTAccount(ulong magic, int deviation)
 bool MTAccount::getAccount(string &result)
   {
 #ifdef __MQL4__
+   int leverage = AccountLeverage();
+#endif
+#ifdef __MQL5__
+   long id = AccountInfoInteger(ACCOUNT_LOGIN);
+   string name = AccountInfoString(ACCOUNT_NAME);
+   string currency = AccountInfoString(ACCOUNT_CURRENCY);
+   long leverage = AccountInfoInteger(ACCOUNT_LEVERAGE);
+   double deposit = AccountInfoDouble(ACCOUNT_ASSETS);
+// Type
+   string type;
+   if(AccountInfoInteger(ACCOUNT_TRADE_MODE) == ACCOUNT_TRADE_MODE_DEMO)
+      type = "demo";
+   else
+      type = "real";
+#endif
+
+   StringAdd(result, StringFormat("id=%d", id));
+   StringAdd(result, StringFormat("|name=%s", name));
+   StringAdd(result, StringFormat("|type=%s", type));
+   StringAdd(result, StringFormat("|currency=%s", currency));
+   StringAdd(result, StringFormat("|deposit=%g", deposit));
+   StringAdd(result, StringFormat("|leverage=%d", leverage));
+   return true;
+  }
+//+------------------------------------------------------------------+
+//| FUND                                                             |
+//+------------------------------------------------------------------+
+bool MTAccount::getFund(string &result)
+  {
+#ifdef __MQL4__
    double balance = AccountBalance();
    double equity = AccountEquity();
-   int leverage = AccountLeverage();
 #endif
 #ifdef __MQL5__
    double balance = AccountInfoDouble(ACCOUNT_BALANCE);
    double equity = AccountInfoDouble(ACCOUNT_EQUITY);
-   long leverage = AccountInfoInteger(ACCOUNT_LEVERAGE);
 #endif
 
    StringAdd(result, StringFormat("balance=%g", balance));
    StringAdd(result, StringFormat("|equity=%g", equity));
-   StringAdd(result, StringFormat("|leverage=%d", leverage));
    return true;
   }
 //+------------------------------------------------------------------+
