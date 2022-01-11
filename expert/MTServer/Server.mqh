@@ -48,7 +48,7 @@ private:
    void              checkRefreshTrades();
    void              doRefreshTrades(void);
 public:
-                     MTServer(ulong magic, int deviation);
+                     MTServer(ulong magic);
    bool              start();
    bool              stop();
    void              onTimer();
@@ -58,7 +58,7 @@ public:
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-void MTServer::MTServer(ulong magic, int deviation)
+void MTServer::MTServer(ulong magic)
   {
    this.context = new Context(PROJECT_NAME);
    this.clientPushSocket = new Socket(this.context, ZMQ_PUSH);
@@ -126,7 +126,7 @@ bool MTServer::startSockets(void)
    else
      {
       PrintFormat("[CLIENT PUSH] Binding MTServer to %s", CLIENT_PULL_URL);
-      this.clientPushSocket.setSendHighWaterMark(1);
+      this.clientPushSocket.setSendHighWaterMark(1000);
       this.clientPushSocket.setLinger(0);
      }
 
@@ -138,7 +138,7 @@ bool MTServer::startSockets(void)
    else
      {
       PrintFormat("[CLIENT PULL] Binding MTServer to %s", CLIENT_PUSH_URL);
-      this.clientPullSocket.setReceiveHighWaterMark(1);
+      this.clientPullSocket.setReceiveHighWaterMark(1000);
       this.clientPullSocket.setLinger(0);
      }
 
@@ -150,7 +150,7 @@ bool MTServer::startSockets(void)
    else
      {
       PrintFormat("[CLIENT PUB] Binding MTServer to port %s", CLIENT_PUB_URL);
-      this.clientPubSocket.setSendHighWaterMark(1);
+      this.clientPubSocket.setSendHighWaterMark(1000);
       this.clientPubSocket.setLinger(0);
      }
 
@@ -163,7 +163,7 @@ bool MTServer::startSockets(void)
    else
      {
       PrintFormat("[WORKER PUSH] Binding to %s", WORKER_PULL_URL);
-      this.workerPushSocket.setSendHighWaterMark(1);
+      this.workerPushSocket.setSendHighWaterMark(1000);
       this.workerPushSocket.setLinger(0);
      }
 
@@ -175,7 +175,7 @@ bool MTServer::startSockets(void)
    else
      {
       PrintFormat("[WORKER PULL] Binding to port %s", WORKER_PUSH_URL);
-      this.workerPullSocket.setSendHighWaterMark(1);
+      this.workerPullSocket.setReceiveHighWaterMark(1000);
       this.workerPullSocket.setLinger(0);
      }
 
@@ -187,7 +187,7 @@ bool MTServer::startSockets(void)
    else
      {
       PrintFormat("[WORKER SUB] Binding to %s", WORKER_PUB_URL);
-      this.workerSubSocket.setSendHighWaterMark(1);
+      this.workerSubSocket.setReceiveHighWaterMark(1000);
       this.workerSubSocket.setLinger(0);
      }
 
@@ -200,7 +200,7 @@ bool MTServer::startSockets(void)
    else
      {
       PrintFormat("[WORKER XPUB] Binding to %s", WORKER_SUB_URL);
-      this.workerXPubSocket.setSendHighWaterMark(1);
+      this.workerXPubSocket.setSendHighWaterMark(1000);
       this.workerXPubSocket.setLinger(0);
      }
 
@@ -254,7 +254,7 @@ bool MTServer::checkTimeout(void)
 void MTServer::exchangeMsg(void)
   {
    ZmqMsg msg;
-   if(this.getMsg(this.clientPullSocket, msg))
+   while(this.getMsg(this.clientPullSocket, msg))
      {
       this.msgTimeout = TimeCurrent() + 30; // expire at next 30 seconds
 
@@ -270,7 +270,7 @@ void MTServer::exchangeMsg(void)
            }
      }
 
-   if(this.getMsg(this.workerPullSocket, msg))
+   while(this.getMsg(this.workerPullSocket, msg))
      {
       if(!this.sendMsg(this.clientPushSocket, msg))
         {
@@ -279,7 +279,7 @@ void MTServer::exchangeMsg(void)
         }
      }
 
-   if(this.getMsg(this.workerSubSocket, msg))
+   while(this.getMsg(this.workerSubSocket, msg))
      {
       if(!this.sendMsg(this.clientPubSocket, msg))
         {
