@@ -20,16 +20,12 @@ class MetaTrader():
     def __init__(
         self,
         host,
-        push_port=32768,
-        pull_port=32769,
-        sub_port=32770,
+        push_port=30001,
+        pull_port=30002,
+        sub_port=30003,
         q=None,
     ):
-        self.host = host
-        self.push_port = push_port
-        self.pull_port = pull_port
-        self.sub_port = sub_port
-        self.url = "tcp://" + self.host + ":"
+        url = f"tcp://{host}:"
         self.q_sub = q
         self.markets = dict()
 
@@ -37,33 +33,25 @@ class MetaTrader():
         self.context = zmq.Context()
 
         # Create Sockets
+        # Bind PUSH Socket to send commands to MetaTrader
         self.push_socket = self.context.socket(zmq.PUSH)
         self.push_socket.setsockopt(zmq.SNDHWM, 1)
-        # self.push_socket_status = {'state': True, 'latest_event': 'N/A'}
+        self.push_socket.connect(f"{url}{push_port}")
+        print(f"[INIT] Connect to METATRADER (PUSH): {push_port}")
 
+        # Connect PULL Socket to receive command responses from MetaTrader
         self.pull_socket = self.context.socket(zmq.PULL)
         self.pull_socket.setsockopt(zmq.RCVHWM, 1)
-        # self.pull_socket_status = {'state': True, 'latest_event': 'N/A'}
+        self.pull_socket.connect(f"{url}{pull_port}")
+        print(f"[INIT] Connect to METATRADER (PULL): {pull_port}")
 
+        # Connect SUB Socket to receive market data from MetaTrader
         self.sub_socket = self.context.socket(zmq.SUB)
         self.sub_socket.setsockopt_string(zmq.SUBSCRIBE, "BARS")
         self.sub_socket.setsockopt_string(zmq.SUBSCRIBE, "QUOTES")
         self.sub_socket.setsockopt_string(zmq.SUBSCRIBE, "REFRESH")
-
-        # Bind PUSH Socket to send commands to MetaTrader
-        self.push_socket.connect(self.url + str(self.push_port))
-        print("[INIT] Ready to send commands to METATRADER (PUSH): " +
-              str(self.push_port))
-
-        # Connect PULL Socket to receive command responses from MetaTrader
-        self.pull_socket.connect(self.url + str(self.pull_port))
-        print("[INIT] Listening for responses from METATRADER (PULL): " +
-              str(self.pull_port))
-
-        # Connect SUB Socket to receive market data from MetaTrader
-        self.sub_socket.connect(self.url + str(self.sub_port))
-        print("[INIT] Listening for market data from METATRADER (SUB): " +
-              str(self.sub_port))
+        self.sub_socket.connect(f"{url}{sub_port}")
+        print(f"[INIT] connect to METATRADER (SUB): {sub_port}")
 
         # Initialize POLL set and register PULL and SUB sockets
         self.poller = zmq.Poller()
@@ -85,7 +73,7 @@ class MetaTrader():
         try:
             socket.send_string(data, zmq.DONTWAIT)
         except zmq.error.Again:
-            print("Resource timeout.. please try again.")
+            print(f"Resource timeout when send data: {data}")
 
     def _recv(self, socket) -> str:
         try:
@@ -428,9 +416,9 @@ class MetaTrader():
         lots=float,
         sl=float,
         tp=float,
-        commission=float,
         swap=float,
         pnl=float,
+        commission=float,
     )
 
     def _parse_deal(self, raw):

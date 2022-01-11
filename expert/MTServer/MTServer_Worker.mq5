@@ -3,20 +3,20 @@
 //|                                  Copyright 2021, MetaQuotes Ltd. |
 //|                                             https://www.mql5.com |
 //+------------------------------------------------------------------+
-#include "./Server.mqh"
-#define MAGIC_NUMBER 1122334455
+#include "./Worker.mqh"
+#define MAGIC_NUMBER 1232131235587
 #define DEVIATION 10
-MTServer *server;
+MTWorker *worker;
 //+------------------------------------------------------------------+
 //| Expert initialization function                                   |
 //+------------------------------------------------------------------+
 int OnInit()
   {
-   server = new MTServer(MAGIC_NUMBER, DEVIATION);
+   worker = new MTWorker(MAGIC_NUMBER, DEVIATION);
    EventSetMillisecondTimer(10);
 
 //---
-   if(!server.start())
+   if(!worker.start())
       return INIT_FAILED;
 //---
    return INIT_SUCCEEDED;
@@ -26,7 +26,7 @@ int OnInit()
 //+------------------------------------------------------------------+
 void OnDeinit(const int reason)
   {
-   server.stop();
+   worker.stop();
    EventKillTimer();
   }
 //+------------------------------------------------------------------+
@@ -34,13 +34,6 @@ void OnDeinit(const int reason)
 //+------------------------------------------------------------------+
 void OnTimer()
   {
-   server.onTimer();
-  }
-//+------------------------------------------------------------------+
-//|                                                                  |
-//+------------------------------------------------------------------+
-void OnTrade()
-  {
-   server.onTrade();
+   worker.onTimer();
   }
 //+------------------------------------------------------------------+

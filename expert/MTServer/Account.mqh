@@ -34,7 +34,6 @@ public:
    bool              modifyOrder(ulong ticket, double price, double sl, double tp, datetime expiration, string &result);
    bool              cancelOrder(ulong ticket, string &result);
    bool              parseOrder(string &result, bool suffix);
-   datetime          getOrdersMinTime();
 
    // History
    bool              getHistoryOrders(string &result, string symbol, datetime fromDate, datetime toDate);
@@ -80,7 +79,7 @@ bool MTAccount::getAccount(string &result)
    string name = AccountInfoString(ACCOUNT_NAME);
    string currency = AccountInfoString(ACCOUNT_CURRENCY);
    long leverage = AccountInfoInteger(ACCOUNT_LEVERAGE);
-   double deposit = AccountInfoDouble(ACCOUNT_ASSETS);
+   double deposit = AccountInfoDouble(ACCOUNT_BALANCE);
 // Type
    string type;
    if(AccountInfoInteger(ACCOUNT_TRADE_MODE) == ACCOUNT_TRADE_MODE_DEMO)
@@ -144,23 +143,6 @@ bool MTAccount::getOrders(string &result, string symbol = "")
       this.parseOrder(result, i > 0);
      }
    return true;
-  }
-//+------------------------------------------------------------------+
-//|                                                                  |
-//+------------------------------------------------------------------+
-datetime MTAccount::getOrdersMinTime()
-  {
-   int total = OrdersTotal();
-   if(total == 0)
-      return 0;
-
-#ifdef __MQL4__
-#endif
-#ifdef __MQL5__
-   if(!OrderGetTicket(0))
-      return 0;
-   return (datetime)OrderGetInteger(ORDER_TIME_SETUP);
-#endif
   }
 
 //+------------------------------------------------------------------+
