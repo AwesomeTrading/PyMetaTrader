@@ -295,7 +295,7 @@ bool MTMarkets::getBars(string symbol, ENUM_TIMEFRAMES period, datetime startTim
    MqlRates rates[];
    int ratesCount = 0;
    if(endTime > TimeCurrent())
-      endTime = TimeCurrent() - period;
+      endTime = TimeCurrent();
 
 // Handling ERR_HISTORY_WILL_UPDATED (4066) and ERR_NO_HISTORY_DATA (4073) errors.
 // For non-chart symbols and time frames MT4 often needs a few requests until the data is available.
@@ -307,7 +307,7 @@ bool MTMarkets::getBars(string symbol, ENUM_TIMEFRAMES period, datetime startTim
       if(errorCode != 0)
          PrintFormat("[ERROR] getBars: %d %s", errorCode, ErrorDescription(errorCode));
 
-      if(ratesCount > 0 && rates[ratesCount - 1].time > endTime)
+      if(ratesCount > 0 || (errorCode != 4066 && errorCode != 4073))
          break;
 
       Sleep(200);
