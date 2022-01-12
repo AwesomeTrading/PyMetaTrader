@@ -548,6 +548,9 @@ bool MTAccount::modifyTrade(ulong ticket, double sl, double tp, string &result)
    double digits = MarketInfo(symbol, MODE_DIGITS);
 #endif
 #ifdef __MQL5__
+   if(!PositionSelectByTicket(ticket))
+      return false;
+
    int digits = (int)SymbolInfoInteger(PositionGetString(POSITION_SYMBOL), SYMBOL_DIGITS);
 #endif
 
