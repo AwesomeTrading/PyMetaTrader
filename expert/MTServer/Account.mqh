@@ -168,9 +168,16 @@ bool MTAccount::getOrder(ulong ticket, string &result)
 //+------------------------------------------------------------------+
 ulong MTAccount::openOrder(string symbol, int type, double lots, double price, double sl, double tp, string comment, string &result)
   {
-   price = NormalizeDouble(price, Digits());
-   sl = NormalizeDouble(sl, Digits());
-   tp = NormalizeDouble(tp, Digits());
+#ifdef __MQL4__
+   double digits = MarketInfo(symbol, MODE_DIGITS);
+#endif
+#ifdef __MQL5__
+   int digits = (int)SymbolInfoInteger(symbol, SYMBOL_DIGITS);
+#endif
+
+   price = NormalizeDouble(price, digits);
+   sl = NormalizeDouble(sl, digits);
+   tp = NormalizeDouble(tp, digits);
 
 #ifdef __MQL4__
    return OrderSend(symbol, type, lots, price, this.slippage, sl, tp, comment, this.magic);
@@ -199,9 +206,19 @@ ulong MTAccount::openOrder(string symbol, int type, double lots, double price, d
 //+------------------------------------------------------------------+
 bool MTAccount::modifyOrder(ulong ticket, double price, double sl, double tp, datetime expiration, string &result)
   {
-   price = NormalizeDouble(price, Digits());
-   sl = NormalizeDouble(sl, Digits());
-   tp = NormalizeDouble(tp, Digits());
+#ifdef __MQL4__
+   double digits = MarketInfo(symbol, MODE_DIGITS);
+#endif
+#ifdef __MQL5__
+   if(!OrderSelect(ticket))
+      return false;
+
+   int digits = (int)SymbolInfoInteger(OrderGetString(ORDER_SYMBOL), SYMBOL_DIGITS);
+#endif
+
+   price = NormalizeDouble(price, digits);
+   sl = NormalizeDouble(sl, digits);
+   tp = NormalizeDouble(tp, digits);
 
 #ifdef __MQL4__
    return OrderModify(ticket, price, sl, tp, expiration);
@@ -476,22 +493,6 @@ bool MTAccount::parseHistoryDeal(ulong ticket, string &result, bool suffix = fal
       StringAdd(result, ";");
    return true;
   }
-//+------------------------------------------------------------------+
-//|                                                                  |
-//+------------------------------------------------------------------+
-/*
-bool MTAccount::closePartialTrade(ulong ticket, double lots, double price, string &result)
-  {
-   price = NormalizeDouble(price, Digits());
-
-#ifdef __MQL4__
-   return OrderClose(ticket, lots, price, this.slippage);
-#endif
-#ifdef __MQL5__
-   return this.trade.PositionClosePartial(ticket, lots);
-#endif
-  }
-*/
 
 //+------------------------------------------------------------------+
 //| TRADES                                                           |
@@ -543,8 +544,15 @@ bool MTAccount::getTrade(ulong ticket, string &result)
 //+------------------------------------------------------------------+
 bool MTAccount::modifyTrade(ulong ticket, double sl, double tp, string &result)
   {
-   sl = NormalizeDouble(sl, Digits());
-   tp = NormalizeDouble(tp, Digits());
+#ifdef __MQL4__
+   double digits = MarketInfo(symbol, MODE_DIGITS);
+#endif
+#ifdef __MQL5__
+   int digits = (int)SymbolInfoInteger(PositionGetString(POSITION_SYMBOL), SYMBOL_DIGITS);
+#endif
+
+   sl = NormalizeDouble(sl, digits);
+   tp = NormalizeDouble(tp, digits);
 
 #ifdef __MQL4__
 #endif

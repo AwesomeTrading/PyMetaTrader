@@ -243,6 +243,7 @@ void MTMarkets::parseQuote(string symbol, string &result, bool suffix = false)
    double bid = MarketInfo(symbol, MODE_BID);
    double ask = MarketInfo(symbol, MODE_ASK);
    double spread = MarketInfo(symbol, MODE_SPREAD);
+   double digits = MarketInfo(symbol, MODE_DIGITS);
 #endif
 #ifdef __MQL5__
    MqlTick lastTick;
@@ -251,9 +252,10 @@ void MTMarkets::parseQuote(string symbol, string &result, bool suffix = false)
    double bid = lastTick.bid;
    double ask = lastTick.ask;
    double spread = (double)SymbolInfoInteger(symbol, SYMBOL_SPREAD);
+   int digits = (int)SymbolInfoInteger(symbol, SYMBOL_DIGITS);
 #endif
 
-   double last = NormalizeDouble((bid + ask) / 2, Digits());
+   double last = NormalizeDouble((bid + ask) / 2, digits);
    double open = iOpen(symbol, PERIOD_D1, 0);
    double high = iHigh(symbol, PERIOD_D1, 0);
    double low = iLow(symbol, PERIOD_D1, 0);
