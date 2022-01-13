@@ -81,11 +81,7 @@ bool MTAccount::getAccount(string &result)
    long leverage = AccountInfoInteger(ACCOUNT_LEVERAGE);
    double deposit = AccountInfoDouble(ACCOUNT_BALANCE);
 // Type
-   string type;
-   if(AccountInfoInteger(ACCOUNT_TRADE_MODE) == ACCOUNT_TRADE_MODE_DEMO)
-      type = "demo";
-   else
-      type = "real";
+   string type = AccountInfoInteger(ACCOUNT_TRADE_MODE) == ACCOUNT_TRADE_MODE_DEMO? "demo":"real";
 #endif
 
    StringAdd(result, StringFormat("id=%d", id));

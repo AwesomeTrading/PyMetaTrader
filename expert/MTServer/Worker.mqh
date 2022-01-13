@@ -666,9 +666,6 @@ bool MTWorker::processRequestCloseTrade(string &params[])
 #ifdef __MQL5__
    ulong ticket = StringToInteger(params[2]);
 #endif
-   string trade = "";
-   this.account.getTrade(ticket, trade);
-
    string result = "";
    this.account.closeTrade(ticket, result);
    return this.requestReply(params[1], result);
