@@ -43,7 +43,7 @@ private:
 
    bool              broadcastWorkers(string msg);
    bool              clearWorkersSubscriptions();
-   datetime          getTradesMinTime();
+   datetime          getOrdersMinTime();
    void              updateRefreshTrades();
    void              checkRefreshTrades();
    void              doRefreshTrades(void);
@@ -72,7 +72,7 @@ void MTServer::MTServer(ulong magic)
 
    this.msgTimeout = TimeCurrent() + 30; // expire at next 30 seconds
    this.tradeRefreshAt = 0;
-   this.tradeRefreshStart = this.getTradesMinTime();
+   this.tradeRefreshStart = this.getOrdersMinTime();
    if(this.tradeRefreshStart == 0)
       this.tradeRefreshStart = TimeCurrent();
   }
@@ -343,7 +343,7 @@ void MTServer::doRefreshTrades(void)
    this.workerPushSocket.send(msg, true); // NON-BLOCKING
 
 // Refresh params
-   this.tradeRefreshStart = this.getTradesMinTime();
+   this.tradeRefreshStart = this.getOrdersMinTime();
    if(this.tradeRefreshStart == 0)
       this.tradeRefreshStart = now;
   }
@@ -351,29 +351,18 @@ void MTServer::doRefreshTrades(void)
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-datetime MTServer::getTradesMinTime(void)
+datetime MTServer::getOrdersMinTime(void)
   {
-   int orderTotal = OrdersTotal();
-   int positionTotal = PositionsTotal();
-   if(orderTotal == 0 && positionTotal == 0)
+   int total = OrdersTotal();
+   if(total == 0)
       return 0;
 
-   datetime minTime = 0;
 #ifdef __MQL5__
 
-   if(orderTotal > 0)
-      if(OrderGetTicket(0))
-         minTime = (datetime)OrderGetInteger(ORDER_TIME_SETUP);
-
-   if(positionTotal > 0)
-      if(PositionGetTicket(0))
-        {
-         datetime positionTime = (datetime)PositionGetInteger(POSITION_TIME);
-         if(minTime == 0 || positionTime < minTime)
-            minTime = positionTime;
-        }
+   if(OrderGetTicket(0))
+      return (datetime)OrderGetInteger(ORDER_TIME_SETUP);
 #endif
 
-   return minTime;
+   return 0;
   }
 //+------------------------------------------------------------------+
