@@ -4,7 +4,8 @@
 //|                                             https://www.mql5.com |
 //+------------------------------------------------------------------+
 #include "./Server.mqh"
-#define MAGIC_NUMBER 1122334455
+#define MAGIC_NUMBER 123123123
+
 MTServer *server;
 //+------------------------------------------------------------------+
 //| Expert initialization function                                   |

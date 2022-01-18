@@ -4,8 +4,9 @@
 //|                                             https://www.mql5.com |
 //+------------------------------------------------------------------+
 #include "./Worker.mqh"
-#define MAGIC_NUMBER 1232131235587
+#define MAGIC_NUMBER 112233
 #define DEVIATION 10
+
 MTWorker *worker;
 //+------------------------------------------------------------------+
 //| Expert initialization function                                   |
