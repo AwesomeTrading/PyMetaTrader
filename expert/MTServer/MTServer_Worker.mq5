@@ -4,7 +4,7 @@
 //|                                             https://www.mql5.com |
 //+------------------------------------------------------------------+
 #include "./Worker.mqh"
-#define MAGIC_NUMBER 112233
+#define MAGIC_NUMBER 456 + MathRand()
 #define DEVIATION 10
 
 MTWorker *worker;

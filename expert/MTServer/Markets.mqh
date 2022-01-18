@@ -307,7 +307,7 @@ bool MTMarkets::getBars(string symbol, ENUM_TIMEFRAMES period, datetime startTim
       ratesCount = CopyRates(symbol, period, startTime, endTime, rates);
       int errorCode = GetLastError();
       if(errorCode != 0)
-         PrintFormat("[ERROR] getBars: %d %s", errorCode, ErrorDescription(errorCode));
+         PrintFormat("[ERROR] getBars: %d %s", errorCode, GetErrorDescription(errorCode));
 
       if(ratesCount > 0 || (errorCode != 4066 && errorCode != 4073))
          break;

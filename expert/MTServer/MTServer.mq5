@@ -4,7 +4,7 @@
 //|                                             https://www.mql5.com |
 //+------------------------------------------------------------------+
 #include "./Server.mqh"
-#define MAGIC_NUMBER 123123123
+#define MAGIC_NUMBER 123 + MathRand()
 
 MTServer *server;
 //+------------------------------------------------------------------+

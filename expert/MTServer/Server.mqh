@@ -13,6 +13,7 @@
 #define WORKER_PUB_URL "tcp://127.0.0.1:32003"
 #define WORKER_SUB_URL "tcp://127.0.0.1:32004"
 
+#define ZMQ_WATERMARK 1000
 
 //+------------------------------------------------------------------+
 //|                                                                  |
@@ -126,7 +127,7 @@ bool MTServer::startSockets(void)
    else
      {
       PrintFormat("[CLIENT PUSH] Binding MTServer to %s", CLIENT_PULL_URL);
-      this.clientPushSocket.setSendHighWaterMark(1000);
+      this.clientPushSocket.setSendHighWaterMark(ZMQ_WATERMARK);
       this.clientPushSocket.setLinger(0);
      }
 
@@ -138,7 +139,7 @@ bool MTServer::startSockets(void)
    else
      {
       PrintFormat("[CLIENT PULL] Binding MTServer to %s", CLIENT_PUSH_URL);
-      this.clientPullSocket.setReceiveHighWaterMark(1000);
+      this.clientPullSocket.setReceiveHighWaterMark(ZMQ_WATERMARK);
       this.clientPullSocket.setLinger(0);
      }
 
@@ -150,7 +151,7 @@ bool MTServer::startSockets(void)
    else
      {
       PrintFormat("[CLIENT PUB] Binding MTServer to port %s", CLIENT_PUB_URL);
-      this.clientPubSocket.setSendHighWaterMark(1000);
+      this.clientPubSocket.setSendHighWaterMark(ZMQ_WATERMARK);
       this.clientPubSocket.setLinger(0);
      }
 
@@ -163,7 +164,7 @@ bool MTServer::startSockets(void)
    else
      {
       PrintFormat("[WORKER PUSH] Binding to %s", WORKER_PULL_URL);
-      this.workerPushSocket.setSendHighWaterMark(1000);
+      this.workerPushSocket.setSendHighWaterMark(ZMQ_WATERMARK);
       this.workerPushSocket.setLinger(0);
      }
 
@@ -175,7 +176,7 @@ bool MTServer::startSockets(void)
    else
      {
       PrintFormat("[WORKER PULL] Binding to port %s", WORKER_PUSH_URL);
-      this.workerPullSocket.setReceiveHighWaterMark(1000);
+      this.workerPullSocket.setReceiveHighWaterMark(ZMQ_WATERMARK);
       this.workerPullSocket.setLinger(0);
      }
 
@@ -187,7 +188,7 @@ bool MTServer::startSockets(void)
    else
      {
       PrintFormat("[WORKER SUB] Binding to %s", WORKER_PUB_URL);
-      this.workerSubSocket.setReceiveHighWaterMark(1000);
+      this.workerSubSocket.setReceiveHighWaterMark(ZMQ_WATERMARK);
       this.workerSubSocket.setLinger(0);
      }
 
@@ -200,7 +201,7 @@ bool MTServer::startSockets(void)
    else
      {
       PrintFormat("[WORKER XPUB] Binding to %s", WORKER_SUB_URL);
-      this.workerXPubSocket.setSendHighWaterMark(1000);
+      this.workerXPubSocket.setSendHighWaterMark(ZMQ_WATERMARK);
       this.workerXPubSocket.setLinger(0);
      }
 
