@@ -37,13 +37,13 @@ class MetaTrader():
         self.push_socket = self.context.socket(zmq.PUSH)
         self.push_socket.setsockopt(zmq.SNDHWM, 1)
         self.push_socket.connect(f"{url}{push_port}")
-        print(f"[INIT] Connect to METATRADER (PUSH): {push_port}")
+        print(f"[INIT] Connecting to METATRADER (PUSH): {push_port}")
 
         # Connect PULL Socket to receive command responses from MetaTrader
         self.pull_socket = self.context.socket(zmq.PULL)
         self.pull_socket.setsockopt(zmq.RCVHWM, 1)
         self.pull_socket.connect(f"{url}{pull_port}")
-        print(f"[INIT] Connect to METATRADER (PULL): {pull_port}")
+        print(f"[INIT] Connecting to METATRADER (PULL): {pull_port}")
 
         # Connect SUB Socket to receive market data from MetaTrader
         self.sub_socket = self.context.socket(zmq.SUB)
@@ -51,7 +51,7 @@ class MetaTrader():
         self.sub_socket.setsockopt_string(zmq.SUBSCRIBE, "QUOTES")
         self.sub_socket.setsockopt_string(zmq.SUBSCRIBE, "REFRESH")
         self.sub_socket.connect(f"{url}{sub_port}")
-        print(f"[INIT] connect to METATRADER (SUB): {sub_port}")
+        print(f"[INIT] Connecting to METATRADER (SUB): {sub_port}")
 
         # Initialize POLL set and register PULL and SUB sockets
         self.poller = zmq.Poller()
@@ -61,6 +61,9 @@ class MetaTrader():
         self._t_wait()
         self._t_ping()
 
+        # Sleep to waiting for connection completed
+        sleep(1)
+
     def stop(self):
         self.push_socket.close()
         self.pull_socket.close()
@@ -69,11 +72,14 @@ class MetaTrader():
         self.poller.unregister(self.sub_socket)
         self.context.destroy(0)
 
-    def _send(self, socket, data):
-        try:
-            socket.send_string(data, zmq.DONTWAIT)
-        except zmq.error.Again:
-            print(f"Resource timeout when send data: {data}")
+    def _send(self, socket, data, retry=5):
+        while retry > 0:
+            try:
+                return socket.send_string(data, zmq.DONTWAIT)
+            except zmq.error.Again:
+                print(f"No consumer: {data}")
+                sleep(1)
+                retry -= 1
 
     def _recv(self, socket) -> str:
         try:
@@ -141,7 +147,7 @@ class MetaTrader():
         try:
             ok, data = q.get(timeout=self.wait_timeout)
         except queue.Empty:
-            raise RuntimeError("No data response")
+            raise RuntimeError(f"No data response for request: {action} {msg}")
         finally:
             del self.waiters[id]
 
