@@ -72,18 +72,12 @@ class MetaTrader():
         self.poller.unregister(self.sub_socket)
         self.context.destroy(0)
 
-    def _send(self, socket, data, retry=5):
-        while retry > 0:
-            try:
-                return socket.send_string(data, zmq.DONTWAIT)
-            except zmq.error.Again:
-                print(f"No consumer: {data}")
-                sleep(1)
-                retry -= 1
+    def _send(self, socket, data):
+        return socket.send_string(data)
 
     def _recv(self, socket) -> str:
         try:
-            return socket.recv_string(zmq.DONTWAIT)
+            return socket.recv_string(zmq.NOBLOCK)
         except zmq.error.Again:
             print("Resource timeout.. please try again.")
 
@@ -410,7 +404,8 @@ class MetaTrader():
         for raw in raws:
             if not raw: continue
             deal = self._parse_deal(raw)
-            deals.append(deal)
+            if deal:
+                deals.append(deal)
         return deals
 
     _deal_format = dict(
@@ -429,6 +424,9 @@ class MetaTrader():
 
     def _parse_deal(self, raw):
         deal = self._parse_data_dict(raw, self._deal_format)
+        if deal['type'] == 'DEAL_TYPE_BALANCE':
+            return None
+
         deal['symbol'] = self._parse_api_symbol(deal['symbol'])
         deal['time'] = deal['time'] * 1000
         return deal
