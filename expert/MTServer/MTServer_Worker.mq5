@@ -7,17 +7,17 @@
 #define MAGIC_NUMBER 456 + MathRand()
 #define DEVIATION 10
 
-MTWorker *worker;
+MTWorker *m_worker;
 //+------------------------------------------------------------------+
 //| Expert initialization function                                   |
 //+------------------------------------------------------------------+
 int OnInit()
   {
-   worker = new MTWorker(MAGIC_NUMBER, DEVIATION);
+   m_worker = new MTWorker(MAGIC_NUMBER, DEVIATION);
    EventSetMillisecondTimer(10);
 
 //---
-   if(!worker.start())
+   if(!m_worker.start())
       return INIT_FAILED;
 //---
    return INIT_SUCCEEDED;
@@ -27,7 +27,7 @@ int OnInit()
 //+------------------------------------------------------------------+
 void OnDeinit(const int reason)
   {
-   worker.stop();
+   m_worker.stop();
    EventKillTimer();
   }
 //+------------------------------------------------------------------+
@@ -35,6 +35,6 @@ void OnDeinit(const int reason)
 //+------------------------------------------------------------------+
 void OnTimer()
   {
-   worker.onTimer();
+   m_worker.onTimer();
   }
 //+------------------------------------------------------------------+

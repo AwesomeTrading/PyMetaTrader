@@ -6,17 +6,17 @@
 #include "./Server.mqh"
 #define MAGIC_NUMBER 123 + MathRand()
 
-MTServer *server;
+MTServer *m_server;
 //+------------------------------------------------------------------+
 //| Expert initialization function                                   |
 //+------------------------------------------------------------------+
 int OnInit()
   {
-   server = new MTServer(MAGIC_NUMBER);
+   m_server = new MTServer(MAGIC_NUMBER);
    EventSetMillisecondTimer(10);
 
 //---
-   if(!server.start())
+   if(!m_server.start())
       return INIT_FAILED;
 //---
    return INIT_SUCCEEDED;
@@ -26,7 +26,7 @@ int OnInit()
 //+------------------------------------------------------------------+
 void OnDeinit(const int reason)
   {
-   server.stop();
+   m_server.stop();
    EventKillTimer();
   }
 //+------------------------------------------------------------------+
@@ -34,13 +34,13 @@ void OnDeinit(const int reason)
 //+------------------------------------------------------------------+
 void OnTimer()
   {
-   server.onTimer();
+   m_server.onTimer();
   }
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
 void OnTrade()
   {
-   server.onTrade();
+   m_server.onTrade();
   }
 //+------------------------------------------------------------------+
