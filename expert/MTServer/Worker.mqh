@@ -119,7 +119,7 @@ public:
 //+------------------------------------------------------------------+
 void MTWorker::MTWorker(ulong magic, int deviation)
   {
-   this.context = new Context(PROJECT_NAME);
+   this.context = new Context(StringFormat("%s-%d", PROJECT_NAME, magic));
    this.pushSocket = new Socket(this.context, ZMQ_PUSH);
    this.pullSocket = new Socket(this.context, ZMQ_PULL);
    this.pubSocket = new Socket(this.context, ZMQ_PUSH);
@@ -220,20 +220,20 @@ bool MTWorker::startSockets(void)
 bool MTWorker::stopSockets(void)
   {
    PrintFormat("[PUSH] Disconnect worker from %s...", WORKER_PUSH_URL);
-   pushSocket.disconnect(WORKER_PUSH_URL);
+   this.pushSocket.disconnect(WORKER_PUSH_URL);
 
    PrintFormat("[PULL] Disconnect worker from %s...", WORKER_PULL_URL);
-   pullSocket.disconnect(WORKER_PULL_URL);
+   this.pullSocket.disconnect(WORKER_PULL_URL);
 
    PrintFormat("[PUB] Disconnect worker from %s...", WORKER_PUB_URL);
-   pubSocket.disconnect(WORKER_PUB_URL);
+   this.pubSocket.disconnect(WORKER_PUB_URL);
 
    PrintFormat("[PUB] Disconnect worker from %s...", WORKER_SUB_URL);
-   subSocket.disconnect(WORKER_SUB_URL);
+   this.subSocket.disconnect(WORKER_SUB_URL);
 
 // Shutdown ZeroMQ Context
-   context.shutdown();
-   context.destroy(0);
+   this.context.shutdown();
+   this.context.destroy(0);
    return true;
   }
 
