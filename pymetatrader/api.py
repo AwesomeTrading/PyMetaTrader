@@ -212,7 +212,8 @@ class MetaTrader():
 
     def get_bars(self, symbol, timeframe, start, end):
         symbol = self._parse_broker_symbol(symbol)
-        request = "{};{};{};{}".format(symbol, timeframe, start, end)
+        request = "{};{};{};{}".format(symbol, timeframe, start / 1000,
+                                       end / 1000)
         data = self._request_and_wait(self.push_socket, 'BARS', request)
         return self._parse_bars(data)
 
