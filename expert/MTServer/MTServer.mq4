@@ -11,35 +11,31 @@ MTServer server;
 //+------------------------------------------------------------------+
 //| Expert initialization function                                   |
 //+------------------------------------------------------------------+
-int OnInit()
-  {
-   EventSetMillisecondTimer(10);
+int OnInit() {
+  EventSetMillisecondTimer(10);
 
-   if(!server.start())
-      return INIT_FAILED;
+  if (!server.start())
+    return INIT_FAILED;
 
-   return INIT_SUCCEEDED;
-  }
+  return INIT_SUCCEEDED;
+}
 //+------------------------------------------------------------------+
 //| Expert deinitialization function                                 |
 //+------------------------------------------------------------------+
-void OnDeinit(const int reason)
-  {
-   server.stop();
-   EventKillTimer();
-  }
+void OnDeinit(const int reason) {
+  server.stop();
+  EventKillTimer();
+}
 //+------------------------------------------------------------------+
 //| Expert tick function                                             |
 //+------------------------------------------------------------------+
-void OnTick()
-  {
-   server.onTick();
-  }
+void OnTick() {
+  server.onTick();
+}
 //+------------------------------------------------------------------+
 //| Timer function                                                   |
 //+------------------------------------------------------------------+
-void OnTimer()
-  {
-   server.onTimer();
-  }
+void OnTimer() {
+  server.onTimer();
+}
 //+------------------------------------------------------------------+
