@@ -37,8 +37,6 @@ class MTServer {
   // Connection
   bool               startSockets();
   bool               stopSockets();
-  void               exchangeMsg();
-  bool               reply(Socket &socket, string message);
 
   datetime           getOrdersMinTime();
   void               updateRefreshTrades();
@@ -49,6 +47,7 @@ class MTServer {
   void               checkRequest(Socket &socket, bool prefix);
   void               parseRequest(string &message, string &retArray[]);
   bool               requestReply(string &id, string &message);
+  bool               reply(Socket &socket, string message);
   bool               processRequest(string &compArray[]);
   bool               processRequestPing(string &params[]);
 
@@ -139,7 +138,7 @@ bool MTServer::stop(void) {
 //|                                                                  |
 //+------------------------------------------------------------------+
 void MTServer::onTimer(void) {
-  this.exchangeMsg();
+  this.checkRequest(this.clientPullSocket);
   this.checkMarketSubscriptions();
   this.checkRefreshTrades();
 }
@@ -199,11 +198,134 @@ bool MTServer::stopSockets(void) {
 }
 
 //+------------------------------------------------------------------+
-//| Message exchange                         |
+//|                                                                  |
 //+------------------------------------------------------------------+
-void MTServer::exchangeMsg(void) {
-  this.checkRequest(this.clientPullSocket);
+void MTServer::checkRequest(Socket &socket, bool prefix = false) {
+  if (IsStopped())
+    return;
+
+  ZmqMsg request;
+
+// Get client's response, but don't block.
+  socket.recv(request, true);
+
+  if (request.size() == 0)
+    return;
+
+// Message components for later.
+  string params[10];
+  string message = request.getData();
+  if (prefix) {
+    int idx = StringFind(message, " ");
+    message = StringSubstr(message, idx + 1);
+  }
+
+// Process data
+  Print("-> Request: " + message);
+  StringSplit(message, separator, params);
+
+// Interpret data
+  this.processRequest(params);
 }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+bool MTServer::requestReply(string &id, string &message) {
+  int errorCode = GetLastError();
+  string msg;
+  if (errorCode == 0) {
+    msg = StringFormat("OK|%s|", id);
+    StringAdd(msg, message);
+  } else {
+    msg = StringFormat("KO|%s|%s", id, GetErrorDescription(errorCode));
+  }
+
+  ResetLastError();
+  return this.reply(this.clientPushSocket, msg);
+}
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+bool MTServer::reply(Socket &socket, string message) {
+  Print("<- Reply: " + message);
+  ZmqMsg msg(message);
+  bool ok = socket.send(msg, true);  // NON-BLOCKING
+  if (!ok)
+    Print("[ERROR] Cannot send data to socket");
+  return ok;
+}
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+bool MTServer::processRequest(string &params[]) {
+  string action = params[0];
+
+// ping
+  if (action == "PING")
+    return this.processRequestPing(params);
+
+// markets
+  if (action == "MARKETS")
+    return this.processRequestMarkets(params);
+  if (action == "TIME")
+    return this.processRequestTime(params);
+  if (action == "BARS")
+    return this.processRequestBars(params);
+  if (action == "SUB_BARS")
+    return this.processRequestSubBars(params);
+  if (action == "UNSUB_BARS")
+    return this.processRequestUnsubBars(params);
+  if (action == "QUOTES")
+    return this.processRequestQuotes(params);
+  if (action == "SUB_QUOTES")
+    return this.processRequestSubQuotes(params);
+  if (action == "UNSUB_QUOTES")
+    return this.processRequestUnsubQuotes(params);
+  if (action == "UNSUB_ALL")
+    return this.processRequestUnsubAll(params);
+
+// account
+  if (action == "ACCOUNT")
+    return this.processRequestAccount(params);
+  if (action == "FUND")
+    return this.processRequestFund(params);
+
+  if (action == "ORDERS")
+    return this.processRequestOrders(params);
+  if (action == "OPEN_ORDER")
+    return this.processRequestOpenOrder(params);
+  if (action == "MODIFY_ORDER")
+    return this.processRequestModifyOrder(params);
+  if (action == "CANCEL_ORDER")
+    return this.processRequestCancelOrder(params);
+
+  if (action == "TRADES")
+    return this.processRequestTrades(params);
+  if (action == "MODIFY_TRADE")
+    return this.processRequestModifyTrade(params);
+  if (action == "CLOSE_TRADE")
+    return this.processRequestCloseTrade(params);
+
+  if (action == "DEALS")
+    return this.processRequestDeals(params);
+
+  return false;
+}
+
+//+------------------------------------------------------------------+
+//| SUBSCRIBERS                                                      |
+//+------------------------------------------------------------------+
+void MTServer::checkMarketSubscriptions() {
+  if (this.flushSubscriptionsAt > TimeCurrent())
+    return;
+
+  this.flushMarketSubscriptions();
+  this.flushSubscriptionsAt = TimeCurrent() + 2;  // flush every 2 seconds
+}
+
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
@@ -246,9 +368,8 @@ datetime MTServer::getOrdersMinTime(void) {
     return 0;
 
 #ifdef __MQL5__
-
-  if (OrderGetTicket(0))
-    return (datetime)OrderGetInteger(ORDER_TIME_SETUP);
+if (OrderGetTicket(0))
+return (datetime)OrderGetInteger(ORDER_TIME_SETUP);
 #endif
 
   return 0;
