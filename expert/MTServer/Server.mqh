@@ -8,11 +8,6 @@
 #include "Helper.mqh"
 #include "Markets.mqh"
 
-#define PROJECT_NAME "MTSERVER"
-#define CLIENT_PUSH_URL "tcp://*:30001"
-#define CLIENT_PULL_URL "tcp://*:30002"
-#define CLIENT_PUB_URL "tcp://*:30003"
-
 #define ZMQ_WATERMARK 1000
 
 //+------------------------------------------------------------------+
@@ -28,6 +23,10 @@ class MTServer {
 
   MTMarkets          *markets;
   MTAccount          *account;
+
+  string             url_push;
+  string             url_pull;
+  string             url_pub;
 
   ushort             separator;
   datetime           flushSubscriptionsAt;
@@ -89,7 +88,7 @@ class MTServer {
   bool               publicRequestRefreshTrades(datetime fromDate, datetime toDate);
 
  public:
-                     MTServer(ulong magic, int deviation);
+                     MTServer(ulong magic, int deviation, int portStart);
   bool               start();
   bool               stop();
   void               onTimer();
@@ -99,8 +98,13 @@ class MTServer {
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-void MTServer::MTServer(ulong magic, int deviation) {
-  this.context = new Context(PROJECT_NAME);
+void MTServer::MTServer(ulong magic, int deviation, int portStart) {
+  this.context = new Context(StringFormat("MTServer-%d", magic));
+
+  this.url_push = StringFormat("tcp://*:%d", portStart);
+  this.url_pull = StringFormat("tcp://*:%d", portStart + 1);
+  this.url_pub = StringFormat("tcp://*:%d", portStart + 2);
+
   this.clientPushSocket = new Socket(this.context, ZMQ_PUSH);
   this.clientPullSocket = new Socket(this.context, ZMQ_PULL);
   this.clientPubSocket = new Socket(this.context, ZMQ_PUB);
@@ -153,29 +157,29 @@ void MTServer::onTrade(void) {
 //+------------------------------------------------------------------+
 bool MTServer::startSockets(void) {
 // Client
-  if (!clientPushSocket.bind(CLIENT_PULL_URL)) {
-    PrintFormat("[CLIENT PUSH] ####ERROR#### Binding MTServer to %s", CLIENT_PULL_URL);
+  if (!clientPushSocket.bind(this.url_pull)) {
+    PrintFormat("[CLIENT PUSH] ####ERROR#### Binding MTServer to %s", this.url_pull);
     return false;
   } else {
-    PrintFormat("[CLIENT PUSH] Binding MTServer to %s", CLIENT_PULL_URL);
+    PrintFormat("[CLIENT PUSH] Binding MTServer to %s", this.url_pull);
     this.clientPushSocket.setSendHighWaterMark(ZMQ_WATERMARK);
     this.clientPushSocket.setLinger(0);
   }
 
-  if (!this.clientPullSocket.bind(CLIENT_PUSH_URL)) {
-    PrintFormat("[CLIENT PULL] ####ERROR#### Binding MTServer to %s", CLIENT_PUSH_URL);
+  if (!this.clientPullSocket.bind(this.url_push)) {
+    PrintFormat("[CLIENT PULL] ####ERROR#### Binding MTServer to %s", this.url_push);
     return false;
   } else {
-    PrintFormat("[CLIENT PULL] Binding MTServer to %s", CLIENT_PUSH_URL);
+    PrintFormat("[CLIENT PULL] Binding MTServer to %s", this.url_push);
     this.clientPullSocket.setReceiveHighWaterMark(ZMQ_WATERMARK);
     this.clientPullSocket.setLinger(0);
   }
 
-  if (!this.clientPubSocket.bind(CLIENT_PUB_URL)) {
-    PrintFormat("[CLIENT PUB] ####ERROR#### Binding MTServer to %s", CLIENT_PUB_URL);
+  if (!this.clientPubSocket.bind(this.url_pub)) {
+    PrintFormat("[CLIENT PUB] ####ERROR#### Binding MTServer to %s", this.url_pub);
     return false;
   } else {
-    PrintFormat("[CLIENT PUB] Binding MTServer to port %s", CLIENT_PUB_URL);
+    PrintFormat("[CLIENT PUB] Binding MTServer to port %s", this.url_pub);
     this.clientPubSocket.setSendHighWaterMark(ZMQ_WATERMARK);
     this.clientPubSocket.setLinger(0);
   }
@@ -187,9 +191,9 @@ bool MTServer::startSockets(void) {
 //|                                                                  |
 //+------------------------------------------------------------------+
 bool MTServer::stopSockets(void) {
-  this.clientPushSocket.unbind(CLIENT_PUSH_URL);
-  this.clientPullSocket.unbind(CLIENT_PULL_URL);
-  this.clientPubSocket.unbind(CLIENT_PUB_URL);
+  this.clientPushSocket.unbind(this.url_push);
+  this.clientPullSocket.unbind(this.url_pull);
+  this.clientPubSocket.unbind(this.url_pub);
 
 // Shutdown ZeroMQ Context
   context.shutdown();
@@ -368,8 +372,8 @@ datetime MTServer::getOrdersMinTime(void) {
     return 0;
 
 #ifdef __MQL5__
-if (OrderGetTicket(0))
-return (datetime)OrderGetInteger(ORDER_TIME_SETUP);
+  if (OrderGetTicket(0))
+    return (datetime)OrderGetInteger(ORDER_TIME_SETUP);
 #endif
 
   return 0;

@@ -7,12 +7,14 @@
 #define MAGIC_NUMBER 123 + MathRand()
 #define DEVIATION 10
 
+input int Server_PortStart = 30000;  // Server: Port start at
+
 MTServer *m_server;
 //+------------------------------------------------------------------+
 //| Expert initialization function                                   |
 //+------------------------------------------------------------------+
 int OnInit() {
-  m_server = new MTServer(MAGIC_NUMBER, DEVIATION);
+  m_server = new MTServer(MAGIC_NUMBER, DEVIATION, Server_PortStart);
   EventSetMillisecondTimer(10);
 
 //---
