@@ -343,7 +343,7 @@ class MetaTrader():
         return self._parse_trades(data)
 
     def modify_trade(self, ticket, sl=0, tp=0):
-        request = f"{ticket};{sl};{tp}"
+        request = f"{ticket};{sl or 0};{tp or 0}"
         self._request_and_wait(self.push_socket, 'MODIFY_TRADE', request)
         return True
 
@@ -452,13 +452,13 @@ class MetaTrader():
         return order
 
     def open_order(self, symbol, type, lots, price, sl=0, tp=0, comment=''):
-        request = f"{symbol};{type};{lots};{price};{sl};{tp};{comment}"
+        request = f"{symbol};{type};{lots};{price or 0};{sl or 0};{tp or 0};{comment}"
         ticket = self._request_and_wait(self.push_socket, 'OPEN_ORDER',
                                         request)
         return int(ticket)
 
     def modify_order(self, ticket, price, sl=0, tp=0, expiration=0):
-        request = f"{ticket};{price};{sl};{tp};{expiration}"
+        request = f"{ticket};{price or 0};{sl or 0};{tp or 0};{expiration or 0}"
         data = self._request_and_wait(self.push_socket, 'MODIFY_ORDER',
                                       request)
         return True
