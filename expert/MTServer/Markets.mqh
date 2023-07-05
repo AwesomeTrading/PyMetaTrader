@@ -104,7 +104,9 @@ bool MTMarkets::getMarkets(string &result) {
 void MTMarkets::parseMarket(string symbol, string &result, bool suffix = false) {
 #ifdef __MQL4__
   string desc = SymbolInfoString(symbol, SYMBOL_DESCRIPTION);
-  string currency = SymbolInfoString(symbol, SYMBOL_CURRENCY_BASE);
+  string currencyBase = SymbolInfoString(symbol, SYMBOL_CURRENCY_BASE);
+  string currencyProfit = SymbolInfoString(symbol, SYMBOL_CURRENCY_PROFIT);
+  string currencyMargin = SymbolInfoString(symbol, SYMBOL_CURRENCY_MARGIN);
   double point = MarketInfo(symbol, MODE_POINT);
   double digits = MarketInfo(symbol, MODE_DIGITS);
   double minlot = MarketInfo(symbol, MODE_MINLOT);
@@ -120,7 +122,9 @@ void MTMarkets::parseMarket(string symbol, string &result, bool suffix = false) 
 #endif
 #ifdef __MQL5__
   string desc = SymbolInfoString(symbol, SYMBOL_DESCRIPTION);
-  string currency = SymbolInfoString(symbol, SYMBOL_CURRENCY_BASE);
+  string currencyBase = SymbolInfoString(symbol, SYMBOL_CURRENCY_BASE);
+  string currencyProfit = SymbolInfoString(symbol, SYMBOL_CURRENCY_PROFIT);
+  string currencyMargin = SymbolInfoString(symbol, SYMBOL_CURRENCY_MARGIN);
   double point = SymbolInfoDouble(symbol, SYMBOL_POINT);
   long digits = SymbolInfoInteger(symbol, SYMBOL_DIGITS);
   double minlot = SymbolInfoDouble(symbol, SYMBOL_VOLUME_MIN);
@@ -134,7 +138,9 @@ void MTMarkets::parseMarket(string symbol, string &result, bool suffix = false) 
 
   StringAdd(result, StringFormat("symbol=%s", symbol));
   StringAdd(result, StringFormat("|description=%s", desc));
-  StringAdd(result, StringFormat("|currency=%s", currency));
+  StringAdd(result, StringFormat("|currencybase=%s", currencyBase));
+  StringAdd(result, StringFormat("|currencyprofit=%s", currencyProfit));
+  StringAdd(result, StringFormat("|currencymargin=%s", currencyMargin));
   StringAdd(result, StringFormat("|point=%g", point));
   StringAdd(result, StringFormat("|digits=%g", digits));
   StringAdd(result, StringFormat("|minlot=%g", minlot));
