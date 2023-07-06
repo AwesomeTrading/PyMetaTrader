@@ -317,6 +317,8 @@ class MetaTrader():
 
     _account_format = dict(
         id=int,
+        deposit=float,
+        margin=float,
         leverage=int,
     )
 

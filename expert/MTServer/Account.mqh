@@ -74,18 +74,24 @@ bool MTAccount::getAccount(string &result) {
 #ifdef __MQL5__
   long id = AccountInfoInteger(ACCOUNT_LOGIN);
   string name = AccountInfoString(ACCOUNT_NAME);
+  string company = AccountInfoString(ACCOUNT_COMPANY);
+  string server = AccountInfoString(ACCOUNT_SERVER);
   string currency = AccountInfoString(ACCOUNT_CURRENCY);
-  long leverage = AccountInfoInteger(ACCOUNT_LEVERAGE);
   double deposit = AccountInfoDouble(ACCOUNT_BALANCE);
+  double margin = AccountInfoDouble(ACCOUNT_MARGIN);
+  long leverage = AccountInfoInteger(ACCOUNT_LEVERAGE);
 // Type
   string type = AccountInfoInteger(ACCOUNT_TRADE_MODE) == ACCOUNT_TRADE_MODE_DEMO ? "demo" : "real";
 #endif
 
   StringAdd(result, StringFormat("id=%d", id));
   StringAdd(result, StringFormat("|name=%s", name));
+  StringAdd(result, StringFormat("|company=%s", company));
+  StringAdd(result, StringFormat("|server=%s", server));
   StringAdd(result, StringFormat("|type=%s", type));
   StringAdd(result, StringFormat("|currency=%s", currency));
   StringAdd(result, StringFormat("|deposit=%g", deposit));
+  StringAdd(result, StringFormat("|margin=%g", margin));
   StringAdd(result, StringFormat("|leverage=%d", leverage));
   return true;
 }
