@@ -6,6 +6,7 @@
 #include "Helper.mqh"
 
 #ifdef __MQL5__
+#include <Trade\SymbolInfo.mqh>
 #include <Trade\Trade.mqh>
 #endif
 
@@ -19,7 +20,8 @@ class MTAccount {
   int                slippage;
 #endif
 #ifdef __MQL5__
-  CTrade             trade;
+  CTrade             m_trade;
+  CSymbolInfo        m_symbol;
 #endif
 
  public:
@@ -60,8 +62,8 @@ void MTAccount::MTAccount(ulong magic, int deviation) {
   this.slippage = deviation;
 #endif
 #ifdef __MQL5__
-  this.trade.SetExpertMagicNumber(magic);
-  this.trade.SetDeviationInPoints(deviation);
+  this.m_trade.SetExpertMagicNumber(magic);
+  this.m_trade.SetDeviationInPoints(deviation);
 #endif
 }
 //+------------------------------------------------------------------+
@@ -176,19 +178,25 @@ ulong MTAccount::openOrder(string symbol, int type, double lots, double price, d
   return OrderSend(symbol, type, lots, price, this.slippage, sl, tp, comment, this.magic);
 #endif
 #ifdef __MQL5__
+// Refresh rates
+  this.m_symbol.Name(symbol);
+  this.m_symbol.RefreshRates();
+
   bool ok;
   switch (type) {
   case ORDER_TYPE_BUY:
+    ok = this.m_trade.PositionOpen(symbol, (ENUM_ORDER_TYPE)type, lots, this.m_symbol.Ask(), sl, tp, comment);
+    break;
   case ORDER_TYPE_SELL:
-    ok = this.trade.PositionOpen(symbol, (ENUM_ORDER_TYPE)type, lots, price, sl, tp, comment);
+    ok = this.m_trade.PositionOpen(symbol, (ENUM_ORDER_TYPE)type, lots, this.m_symbol.Bid(), sl, tp, comment);
     break;
   default:
-    ok = this.trade.OrderOpen(symbol, (ENUM_ORDER_TYPE)type, lots, NULL, price, sl, tp, ORDER_TIME_GTC, 0, comment);
+    ok = this.m_trade.OrderOpen(symbol, (ENUM_ORDER_TYPE)type, lots, NULL, price, sl, tp, ORDER_TIME_GTC, 0, comment);
     break;
   }
 
   if (ok)
-    return this.trade.ResultOrder();
+    return this.m_trade.ResultOrder();
   return 0;
 #endif
 }
@@ -215,7 +223,7 @@ bool MTAccount::modifyOrder(ulong ticket, double price, double sl, double tp, da
   return OrderModify(ticket, price, sl, tp, expiration);
 #endif
 #ifdef __MQL5__
-  return this.trade.OrderModify(ticket, price, sl, tp, ORDER_TIME_GTC, expiration);
+  return this.m_trade.OrderModify(ticket, price, sl, tp, ORDER_TIME_GTC, expiration);
 #endif
 }
 
@@ -227,7 +235,7 @@ bool MTAccount::cancelOrder(ulong ticket, string &result) {
   return OrderDelete(ticket);
 #endif
 #ifdef __MQL5__
-  return this.trade.OrderDelete(ticket);
+  return this.m_trade.OrderDelete(ticket);
 #endif
 }
 
@@ -535,7 +543,7 @@ bool MTAccount::modifyTrade(ulong ticket, double sl, double tp, string &result) 
 #ifdef __MQL4__
 #endif
 #ifdef __MQL5__
-  return this.trade.PositionModify(ticket, sl, tp);
+  return this.m_trade.PositionModify(ticket, sl, tp);
 #endif
 }
 
@@ -551,7 +559,7 @@ bool MTAccount::closeTrade(ulong ticket, string &result) {
   return OrderClose(ticket, OrderLots(), OrderClosePrice(), this.slippage);
 #endif
 #ifdef __MQL5__
-  return this.trade.PositionClose(ticket);
+  return this.m_trade.PositionClose(ticket);
 #endif
 }
 //+------------------------------------------------------------------+
