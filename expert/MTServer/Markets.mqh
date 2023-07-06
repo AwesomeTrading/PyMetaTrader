@@ -122,6 +122,11 @@ void MTMarkets::parseMarket(string symbol, string &result, bool suffix = false) 
 #endif
 #ifdef __MQL5__
   string desc = SymbolInfoString(symbol, SYMBOL_DESCRIPTION);
+  string exchange = SymbolInfoString(symbol, SYMBOL_EXCHANGE);
+  string category = SymbolInfoString(symbol, SYMBOL_CATEGORY);
+  string country = SymbolInfoString(symbol, SYMBOL_COUNTRY);
+  string path = SymbolInfoString(symbol, SYMBOL_PATH);
+  string isin = SymbolInfoString(symbol, SYMBOL_ISIN);
   string currencyBase = SymbolInfoString(symbol, SYMBOL_CURRENCY_BASE);
   string currencyProfit = SymbolInfoString(symbol, SYMBOL_CURRENCY_PROFIT);
   string currencyMargin = SymbolInfoString(symbol, SYMBOL_CURRENCY_MARGIN);
@@ -138,6 +143,11 @@ void MTMarkets::parseMarket(string symbol, string &result, bool suffix = false) 
 
   StringAdd(result, StringFormat("symbol=%s", symbol));
   StringAdd(result, StringFormat("|description=%s", desc));
+  StringAdd(result, StringFormat("|exchange=%s", exchange));
+  StringAdd(result, StringFormat("|category=%s", category));
+  StringAdd(result, StringFormat("|country=%s", country));
+  StringAdd(result, StringFormat("|path=%s", path));
+  StringAdd(result, StringFormat("|isin=%s", isin));
   StringAdd(result, StringFormat("|currencybase=%s", currencyBase));
   StringAdd(result, StringFormat("|currencyprofit=%s", currencyProfit));
   StringAdd(result, StringFormat("|currencymargin=%s", currencyMargin));

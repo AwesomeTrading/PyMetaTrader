@@ -78,29 +78,7 @@ string OperationTypeToString(long type) {
 //|                                                                  |
 //+------------------------------------------------------------------+
 string GetTimeframeText(ENUM_TIMEFRAMES tf) {
-  switch (tf) {
-  case PERIOD_M1:
-    return "M1";
-  case PERIOD_M5:
-    return "M5";
-  case PERIOD_M15:
-    return "M15";
-  case PERIOD_M30:
-    return "M30";
-  case PERIOD_H1:
-    return "H1";
-  case PERIOD_H4:
-    return "H4";
-  case PERIOD_D1:
-    return "D1";
-  case PERIOD_W1:
-    return "W1";
-  case PERIOD_MN1:
-    return "MN1";
-  default:
-    PrintFormat("Timeframe %s parse faile", EnumToString(tf));
-    return "UNKNOWN";
-  }
+  return StringSubstr(EnumToString(tf), 7);
 }
 
 //+------------------------------------------------------------------+
@@ -109,16 +87,36 @@ string GetTimeframeText(ENUM_TIMEFRAMES tf) {
 ENUM_TIMEFRAMES GetTimeframe(string tf) {
   if (tf == "M1")
     return PERIOD_M1;
+  if (tf == "M2")
+    return PERIOD_M2;
+  if (tf == "M3")
+    return PERIOD_M3;
+  if (tf == "M4")
+    return PERIOD_M4;
   if (tf == "M5")
     return PERIOD_M5;
+  if (tf == "M6")
+    return PERIOD_M6;
+  if (tf == "M10")
+    return PERIOD_M10;
+  if (tf == "M12")
+    return PERIOD_M12;
   if (tf == "M15")
     return PERIOD_M15;
+  if (tf == "M20")
+    return PERIOD_M20;
   if (tf == "M30")
     return PERIOD_M30;
   if (tf == "H1")
     return PERIOD_H1;
+  if (tf == "H2")
+    return PERIOD_H2;
   if (tf == "H4")
     return PERIOD_H4;
+  if (tf == "H6")
+    return PERIOD_H6;
+  if (tf == "H8")
+    return PERIOD_H8;
   if (tf == "D1")
     return PERIOD_D1;
   if (tf == "W1")
