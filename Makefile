@@ -1,7 +1,7 @@
 env:
 	conda init bash
 	conda init zsh
-	conda create -y --prefix ./.venv python=3.8
+	conda create -y --prefix ./.venv python=3.11
 	conda activate ./.venv
 	pip install -r requirements.txt
 
