@@ -87,7 +87,7 @@ bool MTAccount::getAccount(string &result) {
 #endif
   int gmtoffset = (int)(MathCeil((double)(TimeCurrent() - TimeGMT())/10)*10);
 
-  StringAdd(result, StringFormat("id=%d", id));
+  StringAdd(result, StringFormat("id=%I64u", id));
   StringAdd(result, StringFormat("|name=%s", name));
   StringAdd(result, StringFormat("|company=%s", company));
   StringAdd(result, StringFormat("|server=%s", server));
@@ -273,8 +273,8 @@ bool MTAccount::parseOrder(string &result, bool suffix = false) {
   long closeTime = OrderGetInteger(ORDER_TIME_DONE);
 #endif
 
-  StringAdd(result, StringFormat("ticket=%d", ticket));
-  StringAdd(result, StringFormat("|position=%d", position));
+  StringAdd(result, StringFormat("ticket=%I64u", ticket));
+  StringAdd(result, StringFormat("|position=%I64u", position));
   StringAdd(result, StringFormat("|symbol=%s", symbol));
   StringAdd(result, StringFormat("|state=%s", state));
   StringAdd(result, StringFormat("|type=%s", type));
@@ -372,8 +372,8 @@ bool MTAccount::parseHistoryOrder(ulong ticket, string &result, bool suffix = fa
   long closeTime = HistoryOrderGetInteger(ticket, ORDER_TIME_DONE);
 #endif
 
-  StringAdd(result, StringFormat("ticket=%d", ticket));
-  StringAdd(result, StringFormat("|position=%d", position));
+  StringAdd(result, StringFormat("ticket=%I64u", ticket));
+  StringAdd(result, StringFormat("|position=%I64u", position));
   StringAdd(result, StringFormat("|symbol=%s", symbol));
   StringAdd(result, StringFormat("|state=%s", state));
   StringAdd(result, StringFormat("|type=%s", type));
@@ -463,9 +463,9 @@ bool MTAccount::parseHistoryDeal(ulong ticket, string &result, bool suffix = fal
   string comment = HistoryDealGetString(ticket, DEAL_COMMENT);
 #endif
 
-  StringAdd(result, StringFormat("ticket=%d", ticket));
-  StringAdd(result, StringFormat("|order=%d", order));
-  StringAdd(result, StringFormat("|position=%d", position));
+  StringAdd(result, StringFormat("ticket=%I64u", ticket));
+  StringAdd(result, StringFormat("|order=%I64u", order));
+  StringAdd(result, StringFormat("|position=%I64u", position));
   StringAdd(result, StringFormat("|symbol=%s", symbol));
   StringAdd(result, StringFormat("|type=%s", type));
   StringAdd(result, StringFormat("|entry=%s", entry));
@@ -571,7 +571,7 @@ bool MTAccount::parseTrade(string &result, bool suffix = false) {
 #ifdef __MQL4__
 #endif
 #ifdef __MQL5__
-  StringAdd(result, StringFormat("ticket=%d", PositionGetInteger(POSITION_TICKET)));
+  StringAdd(result, StringFormat("ticket=%I64u", PositionGetInteger(POSITION_TICKET)));
   StringAdd(result, StringFormat("|symbol=%s", PositionGetString(POSITION_SYMBOL)));
   StringAdd(result, StringFormat("|type=%s", OperationTypeToString(PositionGetInteger(POSITION_TYPE))));
   StringAdd(result, StringFormat("|open_price=%g", PositionGetDouble(POSITION_PRICE_OPEN)));
