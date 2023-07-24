@@ -85,7 +85,7 @@ bool MTAccount::getAccount(string &result) {
 // Type
   string type = AccountInfoInteger(ACCOUNT_TRADE_MODE) == ACCOUNT_TRADE_MODE_DEMO ? "demo" : "real";
 #endif
-  int gmtoffset = (int)MathCeil(TimeCurrent() - TimeGMT());
+  int gmtoffset = (int)(MathCeil((double)(TimeCurrent() - TimeGMT())/10)*10);
 
   StringAdd(result, StringFormat("id=%d", id));
   StringAdd(result, StringFormat("|name=%s", name));
