@@ -254,7 +254,6 @@ class MetaTrader():
         lotsize=float,
         ticksize=float,
         tickvalue=float,
-        gmtoffset=float,
     )
 
     def _parse_market(self, raw):
@@ -320,6 +319,7 @@ class MetaTrader():
         deposit=float,
         margin=float,
         leverage=int,
+        gmtoffset=int,
     )
 
     def _parse_account(self, raw):

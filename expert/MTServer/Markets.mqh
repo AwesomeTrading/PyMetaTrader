@@ -115,7 +115,6 @@ void MTMarkets::parseMarket(string symbol, string &result, bool suffix = false) 
   double lotsize = MarketInfo(symbol, MODE_LOTSIZE);
   double ticksize = MarketInfo(symbol, MODE_TICKSIZE);
   double tickvalue = MarketInfo(symbol, MODE_TICKVALUE);
-  double gmtoffset = TimeGMTOffset();
 
 // bypass: error when get MarketInfo with symbol not in MarketWatch
   GetLastError();
@@ -138,7 +137,6 @@ void MTMarkets::parseMarket(string symbol, string &result, bool suffix = false) 
   double lotsize = SymbolInfoDouble(symbol, SYMBOL_TRADE_CONTRACT_SIZE);
   double ticksize = SymbolInfoDouble(symbol, SYMBOL_TRADE_TICK_SIZE);
   double tickvalue = SymbolInfoDouble(symbol, SYMBOL_TRADE_TICK_VALUE);
-  double gmtoffset = TimeGMTOffset();
 #endif
 
   StringAdd(result, StringFormat("symbol=%s", symbol));
@@ -159,7 +157,6 @@ void MTMarkets::parseMarket(string symbol, string &result, bool suffix = false) 
   StringAdd(result, StringFormat("|lotsize=%g", lotsize));
   StringAdd(result, StringFormat("|ticksize=%g", ticksize));
   StringAdd(result, StringFormat("|tickvalue=%g", tickvalue));
-  StringAdd(result, StringFormat("|gmtoffset=%g", gmtoffset));
   if (suffix)
     StringAdd(result, ";");
 }

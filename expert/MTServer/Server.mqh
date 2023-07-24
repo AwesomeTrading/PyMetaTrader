@@ -272,18 +272,18 @@ bool MTServer::processRequest(string &params[]) {
     return this.processRequestPing(params);
 
 // markets
+  if (action == "BARS")
+    return this.processRequestBars(params);
+  if (action == "QUOTES")
+    return this.processRequestQuotes(params);
   if (action == "MARKETS")
     return this.processRequestMarkets(params);
   if (action == "TIME")
     return this.processRequestTime(params);
-  if (action == "BARS")
-    return this.processRequestBars(params);
   if (action == "SUB_BARS")
     return this.processRequestSubBars(params);
   if (action == "UNSUB_BARS")
     return this.processRequestUnsubBars(params);
-  if (action == "QUOTES")
-    return this.processRequestQuotes(params);
   if (action == "SUB_QUOTES")
     return this.processRequestSubQuotes(params);
   if (action == "UNSUB_QUOTES")

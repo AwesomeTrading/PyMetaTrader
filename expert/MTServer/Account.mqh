@@ -85,6 +85,7 @@ bool MTAccount::getAccount(string &result) {
 // Type
   string type = AccountInfoInteger(ACCOUNT_TRADE_MODE) == ACCOUNT_TRADE_MODE_DEMO ? "demo" : "real";
 #endif
+  int gmtoffset = (int)MathCeil(TimeCurrent() - TimeGMT());
 
   StringAdd(result, StringFormat("id=%d", id));
   StringAdd(result, StringFormat("|name=%s", name));
@@ -95,6 +96,7 @@ bool MTAccount::getAccount(string &result) {
   StringAdd(result, StringFormat("|deposit=%g", deposit));
   StringAdd(result, StringFormat("|margin=%g", margin));
   StringAdd(result, StringFormat("|leverage=%d", leverage));
+  StringAdd(result, StringFormat("|gmtoffset=%d", gmtoffset));
   return true;
 }
 //+------------------------------------------------------------------+
