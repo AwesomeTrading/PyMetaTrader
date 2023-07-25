@@ -54,6 +54,7 @@ class MTMarkets {
   void               parseRate(MqlRates &rate, string &result, bool suffix);
   void               parseMarket(string symbol, string &result, bool suffix);
   void               parseQuote(string symbol, string &result, bool suffix);
+  string             getMarketSessions(string symbol);
 
  public:
   void               MTMarkets();
@@ -157,8 +158,36 @@ void MTMarkets::parseMarket(string symbol, string &result, bool suffix = false) 
   StringAdd(result, StringFormat("|lotsize=%g", lotsize));
   StringAdd(result, StringFormat("|ticksize=%g", ticksize));
   StringAdd(result, StringFormat("|tickvalue=%g", tickvalue));
+  StringAdd(result, StringFormat("|session=%s", this.getMarketSessions(symbol)));
   if (suffix)
     StringAdd(result, ";");
+}
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+string MTMarkets::getMarketSessions(string symbol) {
+  string result = "";
+  int errorCode = GetLastError();
+  if (errorCode != 0)
+    PrintFormat("---------------> ERROR[%s] %d %s", symbol, errorCode, GetErrorDescription(errorCode));
+
+  datetime openSession, closeSession;
+  bool session;
+  for (ENUM_DAY_OF_WEEK day = SUNDAY; day <= SATURDAY; day++) {
+    session = SymbolInfoSessionTrade(symbol, day, 0, openSession, closeSession);
+    if (session) {
+      if (result != "")
+        StringAdd(result, "!");
+
+      StringAdd(result, StringFormat("%s~%d-%d",
+                                     EnumToString(day),
+                                     openSession,
+                                     closeSession));
+    }
+  }
+  ResetLastError();
+  return result;
 }
 
 //+------------------------------------------------------------------+
