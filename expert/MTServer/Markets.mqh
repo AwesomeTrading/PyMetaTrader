@@ -170,23 +170,21 @@ string MTMarkets::getMarketSessions(string symbol) {
   string result = "";
   int errorCode = GetLastError();
   if (errorCode != 0)
-    PrintFormat("---------------> ERROR[%s] %d %s", symbol, errorCode, GetErrorDescription(errorCode));
+    PrintFormat("[ERROR] %s %d %s", symbol, errorCode, GetErrorDescription(errorCode));
 
   datetime openSession, closeSession;
-  bool session;
+  uint session;
   for (ENUM_DAY_OF_WEEK day = SUNDAY; day <= SATURDAY; day++) {
-    for (int index = 0; index < 5; index++) {
-      session = SymbolInfoSessionTrade(symbol, day, index, openSession, closeSession);
-      if (session) {
-        if (result != "")
-          StringAdd(result, "!");
+    session = 0;
+    while (SymbolInfoSessionTrade(symbol, day, session, openSession, closeSession)) {
+      if (result != "")
+        StringAdd(result, "!");
 
-        StringAdd(result, StringFormat("%s~%d-%d",
-                                       EnumToString(day),
-                                       openSession,
-                                       closeSession));
-      } else
-        break;
+      StringAdd(result, StringFormat("%s~%d-%d",
+                                     EnumToString(day),
+                                     openSession,
+                                     closeSession));
+      session++;
     }
   }
   ResetLastError();
@@ -216,6 +214,9 @@ bool MTMarkets::getQuotes(string &result) {
 //|                                                                  |
 //+------------------------------------------------------------------+
 bool MTMarkets::subscribeQuote(string symbol) {
+  if (!MarketIsOpen(symbol))
+    return false;
+
   int size = ArraySize(this.symbols);
   for (int i = 0; i < size; i++) {
     if (this.symbols[i] == symbol)
@@ -355,6 +356,9 @@ bool MTMarkets::getBars(string symbol, ENUM_TIMEFRAMES period, datetime startTim
 //|                                                                  |
 //+------------------------------------------------------------------+
 bool MTMarkets::subscribeBar(string symbol, ENUM_TIMEFRAMES period) {
+  if (!MarketIsOpen(symbol))
+    return false;
+
   int size = ArraySize(this.instruments);
   for (int i = 0; i < size; i++) {
     if (this.instruments[i].equal(symbol, period))

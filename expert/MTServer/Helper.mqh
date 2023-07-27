@@ -195,4 +195,26 @@ datetime TimestampToGMTTime(string timestamp) {
 datetime TimestampToGMTTime(double timestamp) {
   return (datetime)timestamp;
 }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+bool MarketIsOpen(string symbol) {
+  MqlDateTime time;
+  datetime now = TimeCurrent();
+  TimeToStruct(now, time);
+
+  uint nowSeconds = (time.hour * 3600) + (time.min * 60) + time.sec;
+
+  datetime from, to;
+  uint session = 0;
+  while (SymbolInfoSessionTrade(symbol, (ENUM_DAY_OF_WEEK)time.day_of_week, session, from, to)) {
+    if (from < nowSeconds && nowSeconds < to)
+      return true;
+    session++;
+  }
+
+  ResetLastError();
+  return false;
+}
 //+------------------------------------------------------------------+
