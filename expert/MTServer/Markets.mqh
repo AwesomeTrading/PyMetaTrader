@@ -175,15 +175,18 @@ string MTMarkets::getMarketSessions(string symbol) {
   datetime openSession, closeSession;
   bool session;
   for (ENUM_DAY_OF_WEEK day = SUNDAY; day <= SATURDAY; day++) {
-    session = SymbolInfoSessionTrade(symbol, day, 0, openSession, closeSession);
-    if (session) {
-      if (result != "")
-        StringAdd(result, "!");
+    for (int index = 0; index < 5; index++) {
+      session = SymbolInfoSessionTrade(symbol, day, index, openSession, closeSession);
+      if (session) {
+        if (result != "")
+          StringAdd(result, "!");
 
-      StringAdd(result, StringFormat("%s~%d-%d",
-                                     EnumToString(day),
-                                     openSession,
-                                     closeSession));
+        StringAdd(result, StringFormat("%s~%d-%d",
+                                       EnumToString(day),
+                                       openSession,
+                                       closeSession));
+      } else
+        break;
     }
   }
   ResetLastError();
