@@ -323,8 +323,8 @@ void MTMarkets::parseQuote(string symbol, string &result, bool suffix = false) {
 bool MTMarkets::getBars(string symbol, ENUM_TIMEFRAMES period, datetime startTime, datetime endTime, string &result) {
   MqlRates rates[];
   int ratesCount = 0;
-  if (endTime > TimeCurrent())
-    endTime = TimeCurrent();
+  if (endTime > TimeTradeServer())
+    endTime = TimeTradeServer();
 
 // Handling ERR_HISTORY_WILL_UPDATED (4066) and ERR_NO_HISTORY_DATA (4073) errors.
 // For non-chart symbols and time frames MT4 often needs a few requests until the data is available.
@@ -416,8 +416,9 @@ bool MTMarkets::getLastBars(string &result) {
   MqlRates rates[1];
   int total = ArraySize(this.instruments);
 
+  Instrument instrument;
   for (int i = total - 1; i >= 0; i--) {
-    Instrument instrument = this.instruments[i];
+    instrument = this.instruments[i];
     instrument.GetRates(rates, 1);
     StringAdd(result, StringFormat("%s|%s|",
                                    instrument.getSymbol(),

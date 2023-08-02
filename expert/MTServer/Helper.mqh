@@ -201,7 +201,7 @@ datetime TimestampToGMTTime(double timestamp) {
 //+------------------------------------------------------------------+
 bool MarketIsOpen(string symbol) {
   MqlDateTime time;
-  datetime now = TimeCurrent();
+  datetime now = TimeTradeServer();
   TimeToStruct(now, time);
 
   uint nowSeconds = (time.hour * 3600) + (time.min * 60) + time.sec;

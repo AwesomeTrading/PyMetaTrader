@@ -133,7 +133,7 @@ bool MTServer::processRequestUnsubAll(string &params[]) {
 //| MARKET TIME                                                      |
 //+------------------------------------------------------------------+
 bool MTServer::processRequestTime(string &params[]) {
-  string result = StringFormat("%f", TimeCurrent());
+  string result = StringFormat("%f", TimeTradeServer());
   return this.requestReply(params[1], result);
 }
 

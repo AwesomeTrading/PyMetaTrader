@@ -296,7 +296,7 @@ bool MTAccount::parseOrder(string &result, bool suffix = false) {
 //+------------------------------------------------------------------+
 bool MTAccount::getHistoryOrders(string &result, string symbol = "", datetime fromDate = 0, datetime toDate = 0) {
   if (toDate == 0)
-    toDate = TimeCurrent();
+    toDate = TimeTradeServer();
   if (fromDate == 0)
     // Default get deals from last 7 days
     fromDate = toDate - PERIOD_D1 * 7;
@@ -394,7 +394,7 @@ bool MTAccount::parseHistoryOrder(ulong ticket, string &result, bool suffix = fa
 //+------------------------------------------------------------------+
 bool MTAccount::getHistoryDeals(string &result, string symbol = "", datetime fromDate = 0, datetime toDate = 0) {
   if (toDate == 0)
-    toDate = TimeCurrent();
+    toDate = TimeTradeServer();
   if (fromDate == 0)
     // Default get deals from last 7 days
     fromDate = toDate - PERIOD_D1 * 7;

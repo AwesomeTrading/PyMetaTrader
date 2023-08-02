@@ -118,7 +118,7 @@ void MTServer::MTServer(ulong magic, int deviation, int portStart) {
   this.tradeRefreshAt = 0;
   this.tradeRefreshStart = this.getOrdersMinTime();
   if (this.tradeRefreshStart == 0)
-    this.tradeRefreshStart = TimeCurrent();
+    this.tradeRefreshStart = TimeTradeServer();
 }
 //+------------------------------------------------------------------+
 //|                                                                  |
@@ -323,18 +323,18 @@ bool MTServer::processRequest(string &params[]) {
 //| SUBSCRIBERS                                                      |
 //+------------------------------------------------------------------+
 void MTServer::checkMarketSubscriptions() {
-  if (this.flushSubscriptionsAt > TimeCurrent())
+  if (this.flushSubscriptionsAt > TimeTradeServer())
     return;
 
   this.flushMarketSubscriptions();
-  this.flushSubscriptionsAt = TimeCurrent() + 2;  // flush every 2 seconds
+  this.flushSubscriptionsAt = TimeTradeServer() + 2;  // flush every 2 seconds
 }
 
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
 void MTServer::updateRefreshTrades(void) {
-  this.tradeRefreshAt = TimeCurrent() + 1;
+  this.tradeRefreshAt = TimeTradeServer() + 1;
 }
 
 //+------------------------------------------------------------------+
@@ -343,7 +343,7 @@ void MTServer::updateRefreshTrades(void) {
 void MTServer::checkRefreshTrades(void) {
   if (this.tradeRefreshAt == 0)
     return;
-  if (this.tradeRefreshAt > TimeCurrent())
+  if (this.tradeRefreshAt > TimeTradeServer())
     return;
 
   this.doRefreshTrades();
@@ -354,7 +354,7 @@ void MTServer::checkRefreshTrades(void) {
 //|                                                                  |
 //+------------------------------------------------------------------+
 void MTServer::doRefreshTrades(void) {
-  datetime now = TimeCurrent();
+  datetime now = TimeTradeServer();
   this.publicRequestRefreshTrades(this.tradeRefreshStart, now + 1);
 
 // Refresh params
