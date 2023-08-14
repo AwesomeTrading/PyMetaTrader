@@ -52,8 +52,8 @@ class MTMarkets {
   Instrument         instruments[];
 
   void               parseRate(string &result, MqlRates &rate, bool prefix);
-  void               parseMarket(string symbol, string &result, bool prefix);
-  void               parseQuote(string symbol, string &result, bool prefix);
+  void               parseMarket(string &result, string symbol, bool prefix);
+  void               parseQuote(string &result, string symbol, bool prefix);
   string             getMarketSessions(string symbol);
   void               barBuilding(string &result, string symbol, ENUM_TIMEFRAMES period, MqlRates &rate, bool prefix);
 
@@ -61,7 +61,7 @@ class MTMarkets {
   void               MTMarkets();
   bool               getMarkets(string &result);
 
-  bool               getBars(string symbol, ENUM_TIMEFRAMES period, datetime startTime, datetime endTime, string &result);
+  bool               getBars(string &result, string symbol, ENUM_TIMEFRAMES period, datetime startTime, datetime endTime);
   bool               subscribeBar(string symbol, ENUM_TIMEFRAMES period);
   bool               unsubscribeBar(string symbol, ENUM_TIMEFRAMES period);
   bool               hasBarSubscribers(void);
@@ -94,16 +94,16 @@ bool MTMarkets::getMarkets(string &result) {
   if (total == 0)
     return true;
 
-  for (int i = total - 1; i >= 0; i--) {
+  for (int i = 0; i < total; i++) {
     string symbol = SymbolName(i, false);
-    this.parseMarket(symbol, result, i > 0);
+    this.parseMarket(result, symbol, i > 0);
   }
   return true;
 }
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-void MTMarkets::parseMarket(string symbol, string &result, bool prefix = false) {
+void MTMarkets::parseMarket(string &result, string symbol, bool prefix = false) {
 #ifdef __MQL4__
   string desc = SymbolInfoString(symbol, SYMBOL_DESCRIPTION);
   string currencyBase = SymbolInfoString(symbol, SYMBOL_CURRENCY_BASE);
@@ -205,9 +205,9 @@ bool MTMarkets::getQuotes(string &result) {
   if (total == 0)
     return true;
 
-  for (int i = total - 1; i >= 0; i--) {
+  for (int i = 0; i < total; i++) {
     string symbol = SymbolName(i, true);
-    this.parseQuote(symbol, result, i > 0);
+    this.parseQuote(result, symbol, i > 0);
   }
   return true;
 }
@@ -259,16 +259,16 @@ bool MTMarkets::getLastQuotes(string &result) {
 #endif
 
   int total = ArraySize(this.symbols);
-  for (int i = total - 1; i >= 0; i--) {
+  for (int i = 0; i < total; i++) {
     string symbol = this.symbols[i];
-    this.parseQuote(symbol, result, i > 0);
+    this.parseQuote(result, symbol, i > 0);
   }
   return true;
 }
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-void MTMarkets::parseQuote(string symbol, string &result, bool prefix = false) {
+void MTMarkets::parseQuote(string &result, string symbol, bool prefix = false) {
 #ifdef __MQL4__
   double bid = MarketInfo(symbol, MODE_BID);
   double ask = MarketInfo(symbol, MODE_ASK);
@@ -322,9 +322,9 @@ void MTMarkets::parseQuote(string symbol, string &result, bool prefix = false) {
 //+------------------------------------------------------------------+
 //| BARS                                                             |
 //+------------------------------------------------------------------+
-bool MTMarkets::getBars(string symbol, ENUM_TIMEFRAMES period, datetime startTime, datetime endTime, string &result) {
+bool MTMarkets::getBars(string &result, string symbol, ENUM_TIMEFRAMES period, datetime startTime, datetime endTime) {
   MqlRates rates[];
-  int ratesCount = 0;
+  int total = 0;
   if (endTime > TimeTradeServer())
     endTime = TimeTradeServer();
 
@@ -332,28 +332,28 @@ bool MTMarkets::getBars(string symbol, ENUM_TIMEFRAMES period, datetime startTim
 // For non-chart symbols and time frames MT4 often needs a few requests until the data is available.
 // But even after 10 requests it can happen that it is not available. So it is best to have the charts open.
   for (int i = 0; i < 5; i++) {
-    ratesCount = CopyRates(symbol, period, startTime, endTime, rates);
+    total = CopyRates(symbol, period, startTime, endTime, rates);
     int errorCode = GetLastError();
     if (errorCode != 0)
       PrintFormat("[ERROR] getBars: %d %s", errorCode, GetErrorDescription(errorCode));
 
-    if (ratesCount > 0 || (errorCode != 4066 && errorCode != 4073))
+    if (total > 0 || (errorCode != 4066 && errorCode != 4073))
       break;
 
     Sleep(200);
   }
 
 // cannot load history data
-  if (ratesCount <= 0)
+  if (total <= 0)
     return false;
 
 // add history to response string
-  for (int i = 0; i < ratesCount; i++) {
+  for (int i = 0; i < total; i++) {
     this.parseRate(result, rates[i], i > 0);
   }
 
 // add bar building status
-  this.barBuilding(result, symbol, period, rates[ratesCount - 1], true);
+  this.barBuilding(result, symbol, period, rates[total - 1], true);
 
   return true;
 }
@@ -411,7 +411,7 @@ bool MTMarkets::getLastBars(string &result) {
   int total = ArraySize(this.instruments);
 
   Instrument instrument;
-  for (int i = total - 1; i >= 0; i--) {
+  for (int i = 0; i < total; i++) {
     instrument = this.instruments[i];
     instrument.GetRates(rates, 1);
     StringAdd(result, StringFormat("%s|%s|",

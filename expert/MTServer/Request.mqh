@@ -58,7 +58,7 @@ bool MTServer::processRequestBars(string &params[]) {
   datetime endTime = TimestampToGMTTime(params[5]);
 
   string result = "";
-  this.markets.getBars(symbol, period, startTime, endTime, result);
+  this.markets.getBars(result, symbol, period, startTime, endTime);
   return this.requestReply(params[1], result);
 }
 
@@ -187,7 +187,7 @@ bool MTServer::processRequestOpenOrder(string &params[]) {
   string comment = params[8];
 
   string result = "";
-  ulong ticket = this.account.openOrder(symbol, type, lots, price, sl, tp, comment, result);
+  ulong ticket = this.account.openOrder(result, symbol, type, lots, price, sl, tp, comment);
 
   StringAdd(result, IntegerToString(ticket));
   return this.requestReply(params[1], result);
@@ -211,7 +211,7 @@ bool MTServer::processRequestModifyOrder(string &params[]) {
 
 // process
   string result = "";
-  this.account.modifyOrder(ticket, price, sl, tp, expiration, result);
+  this.account.modifyOrder(result, ticket, price, sl, tp, expiration);
   return this.requestReply(params[1], result);
 }
 
@@ -227,7 +227,7 @@ bool MTServer::processRequestCancelOrder(string &params[]) {
 #endif
 
   string result = "";
-  this.account.cancelOrder(ticket, result);
+  this.account.cancelOrder(result, ticket);
   return this.requestReply(params[1], result);
 }
 
@@ -255,7 +255,7 @@ bool MTServer::processRequestModifyTrade(string &params[]) {
 
 // process
   string result = "";
-  this.account.modifyTrade(ticket, sl, tp, result);
+  this.account.modifyTrade(result, ticket, sl, tp);
   return this.requestReply(params[1], result);
 }
 
@@ -270,7 +270,7 @@ bool MTServer::processRequestCloseTrade(string &params[]) {
   ulong ticket = StringToInteger(params[2]);
 #endif
   string result = "";
-  this.account.closeTrade(ticket, result);
+  this.account.closeTrade(result, ticket);
   return this.requestReply(params[1], result);
 }
 //+------------------------------------------------------------------+
