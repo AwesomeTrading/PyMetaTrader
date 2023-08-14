@@ -414,10 +414,13 @@ bool MTMarkets::getLastBars(string &result) {
   for (int i = 0; i < total; i++) {
     instrument = this.instruments[i];
     instrument.GetRates(rates, 1);
+    if (i > 0)
+      StringAdd(result, ";");
+
     StringAdd(result, StringFormat("%s|%s|",
                                    instrument.getSymbol(),
                                    GetTimeframeText(instrument.getTimeframe())));
-    this.parseRate(result, rates[0], i > 0);
+    this.parseRate(result, rates[0], false);
   }
   return true;
 }

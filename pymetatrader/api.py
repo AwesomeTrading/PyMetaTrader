@@ -218,14 +218,16 @@ class MetaTrader:
 
         # building status
         if raws[-1] == "building":
+            raws.pop()
             building = True
         else:
             building = False
 
+        # parsing
         bars = []
         for raw in raws:
-            # if not raw:
-            #     continue
+            if not raw:
+                continue
 
             bar = self._parse_bar(raw)
             bars.append(bar)
