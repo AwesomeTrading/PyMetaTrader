@@ -1,8 +1,8 @@
 env:
 	conda init bash
 	conda init zsh
-	conda create -y --prefix ./.venv python=3.11
-	conda activate ./.venv
+	conda create -n PyMetaTrader python=3.11
+	conda activate PyMetaTrader
 	pip install -r requirements.txt
 
 freeze:
