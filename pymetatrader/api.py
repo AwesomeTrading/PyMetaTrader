@@ -8,12 +8,13 @@ from time import sleep
 
 
 def random_id(length=6):
-    return ''.join(random.SystemRandom().choice(string.ascii_uppercase +
-                                                string.digits)
-                   for _ in range(length))
+    return "".join(
+        random.SystemRandom().choice(string.ascii_uppercase + string.digits)
+        for _ in range(length)
+    )
 
 
-class MetaTrader():
+class MetaTrader:
     wait_timeout = 10000
     waiters = dict()
 
@@ -81,7 +82,7 @@ class MetaTrader():
         except zmq.error.Again:
             print("Resource timeout.. please try again.")
 
-    ### PING
+    # PING
     def _t_ping(self):
         t = threading.Thread(target=self._loop_ping, daemon=False)
         t.start()
@@ -89,11 +90,11 @@ class MetaTrader():
     def _loop_ping(self, delay=20):
         while True:
             sleep(delay)
-            data = self._request_and_wait(self.push_socket, 'PING')
+            data = self._request_and_wait(self.push_socket, "PING")
             if data != "PONG":
                 raise RuntimeError("Ping response is invalid")
 
-    ### EVENTS
+    # EVENTS
     def _t_wait(self):
         t = threading.Thread(target=self._loop_wait, daemon=False)
         t.start()
@@ -127,7 +128,7 @@ class MetaTrader():
                 except Exception as e:
                     print("Wait socket data error: ", e, msg)
 
-    def _request(self, socket, action, msg=''):
+    def _request(self, socket, action, msg=""):
         request_id = random_id()
         request = "{};{};{}".format(action, request_id, msg)
         self._send(socket, request)
@@ -136,7 +137,7 @@ class MetaTrader():
         self.waiters[request_id] = q
         return request_id, q
 
-    def _request_and_wait(self, socket, action, msg=''):
+    def _request_and_wait(self, socket, action, msg=""):
         id, q = self._request(socket, action, msg)
         try:
             ok, data = q.get(timeout=self.wait_timeout)
@@ -190,42 +191,48 @@ class MetaTrader():
 
         raise RuntimeError(f"Cannot parse subscribe data: {type} {data}")
 
-    ### MARKETS
+    # MARKETS
     # time
     def get_time(self):
-        data = self._request_and_wait(self.push_socket, 'TIME')
+        data = self._request_and_wait(self.push_socket, "TIME")
         return float(data)
 
     # bars
     def subscribe_bars(self, symbol, timeframe):
         request = "{};{}".format(symbol, timeframe)
-        data = self._request_and_wait(self.push_socket, 'SUB_BARS', request)
+        data = self._request_and_wait(self.push_socket, "SUB_BARS", request)
         return True
 
     def unsubscribe_bars(self, symbol, timeframe):
         request = "{};{}".format(symbol, timeframe)
-        data = self._request_and_wait(self.push_socket, 'UNSUB_BARS', request)
+        data = self._request_and_wait(self.push_socket, "UNSUB_BARS", request)
         return True
 
     def get_bars(self, symbol, timeframe, start, end):
-        request = "{};{};{};{}".format(symbol, timeframe, start / 1000,
-                                       end / 1000)
-        data = self._request_and_wait(self.push_socket, 'BARS', request)
-        return self._parse_bars(data)
+        request = "{};{};{};{}".format(symbol, timeframe, start / 1000, end / 1000)
+        raws = self._request_and_wait(self.push_socket, "BARS", request)
+        return self._parse_bars(raws)
 
     def _parse_bars(self, data):
-        raws = data.split(';')
+        raws = data.split(";")
+
+        # building status
+        if raws[-1] == "building":
+            building = True
+        else:
+            building = False
+
         bars = []
         for raw in raws:
-            if not raw:
-                continue
+            # if not raw:
+            #     continue
 
             bar = self._parse_bar(raw)
             bars.append(bar)
-        return bars
+        return bars, building
 
     def _parse_bar(self, raw):
-        bar = raw.split('|')
+        bar = raw.split("|")
         bar[0] = float(bar[0]) * 1000
         for i in range(1, len(bar)):
             bar[i] = float(bar[i])
@@ -233,16 +240,16 @@ class MetaTrader():
 
     # symbols
     def get_markets(self):
-        data = self._request_and_wait(self.push_socket, 'MARKETS')
+        data = self._request_and_wait(self.push_socket, "MARKETS")
         return self._parse_markets(data)
 
     def _parse_markets(self, data):
-        raws = data.split(';')
+        raws = data.split(";")
         markets = []
         for raw in raws:
             markets.append(self._parse_market(raw))
 
-        self.markets = {m['id']: m for m in markets}
+        self.markets = {m["id"]: m for m in markets}
         return markets
 
     _market_format = dict(
@@ -258,24 +265,24 @@ class MetaTrader():
 
     def _parse_market(self, raw):
         market = self._parse_data_dict(raw, self._market_format)
-        market['id'] = market['symbol']
+        market["id"] = market["symbol"]
         return market
 
     # quote
     def get_quotes(self, symbols=[]):
-        quotes = self._request_and_wait(self.push_socket, 'QUOTES')
+        quotes = self._request_and_wait(self.push_socket, "QUOTES")
         quotes = self._parse_quotes(quotes)
         if not symbols:
             return quotes
 
         results = []
         for quote in quotes:
-            if quote['symbol'] in symbols:
+            if quote["symbol"] in symbols:
                 results.append(quote)
         return results
 
     def _parse_quotes(self, data):
-        raws = data.split(';')
+        raws = data.split(";")
         quotes = []
         for raw in raws:
             quotes.append(self._parse_quote(raw))
@@ -301,17 +308,17 @@ class MetaTrader():
         return quote
 
     def subscribe_quotes(self, symbol):
-        data = self._request_and_wait(self.push_socket, 'SUB_QUOTES', symbol)
+        data = self._request_and_wait(self.push_socket, "SUB_QUOTES", symbol)
         return True
 
     def unsubscribe_quotes(self, symbol):
-        data = self._request_and_wait(self.push_socket, 'UNSUB_QUOTES', symbol)
+        data = self._request_and_wait(self.push_socket, "UNSUB_QUOTES", symbol)
         return True
 
-    ### ACCOUNT
+    # ACCOUNT
     # account
     def get_account(self):
-        data = self._request_and_wait(self.push_socket, 'ACCOUNT')
+        data = self._request_and_wait(self.push_socket, "ACCOUNT")
         return self._parse_account(data)
 
     _account_format = dict(
@@ -327,7 +334,7 @@ class MetaTrader():
 
     # fund
     def get_fund(self):
-        data = self._request_and_wait(self.push_socket, 'FUND')
+        data = self._request_and_wait(self.push_socket, "FUND")
         return self._parse_fund(data)
 
     _fund_format = dict(
@@ -340,21 +347,21 @@ class MetaTrader():
         return fund
 
     # trades
-    def get_trades(self, symbol=''):
-        data = self._request_and_wait(self.push_socket, 'TRADES', symbol)
+    def get_trades(self, symbol=""):
+        data = self._request_and_wait(self.push_socket, "TRADES", symbol)
         return self._parse_trades(data)
 
     def modify_trade(self, ticket, sl=0, tp=0):
         request = f"{ticket};{sl or 0};{tp or 0}"
-        self._request_and_wait(self.push_socket, 'MODIFY_TRADE', request)
+        self._request_and_wait(self.push_socket, "MODIFY_TRADE", request)
         return True
 
     def close_trade(self, ticket):
-        self._request_and_wait(self.push_socket, 'CLOSE_TRADE', ticket)
+        self._request_and_wait(self.push_socket, "CLOSE_TRADE", ticket)
         return True
 
     def _parse_trades(self, data):
-        raws = data.split(';')
+        raws = data.split(";")
         trades = []
         for raw in raws:
             if not raw:
@@ -377,20 +384,21 @@ class MetaTrader():
 
     def _parse_trade(self, raw):
         trade = self._parse_data_dict(raw, self._trade_format)
-        trade['open_time'] = trade['open_time'] * 1000
+        trade["open_time"] = trade["open_time"] * 1000
         return trade
 
     # deals
-    def get_deals(self, symbol='', fromdate=0):
+    def get_deals(self, symbol="", fromdate=0):
         request = "{};{}".format(symbol, fromdate)
-        data = self._request_and_wait(self.push_socket, 'DEALS', request)
+        data = self._request_and_wait(self.push_socket, "DEALS", request)
         return self._parse_deals(data)
 
     def _parse_deals(self, data):
-        raws = data.split(';')
+        raws = data.split(";")
         deals = []
         for raw in raws:
-            if not raw: continue
+            if not raw:
+                continue
             deal = self._parse_deal(raw)
             if deal:
                 deals.append(deal)
@@ -412,19 +420,19 @@ class MetaTrader():
 
     def _parse_deal(self, raw):
         deal = self._parse_data_dict(raw, self._deal_format)
-        if deal['type'] == 'DEAL_TYPE_BALANCE':
+        if deal["type"] == "DEAL_TYPE_BALANCE":
             return None
 
-        deal['time'] = deal['time'] * 1000
+        deal["time"] = deal["time"] * 1000
         return deal
 
     # orders
     def get_open_orders(self):
-        data = self._request_and_wait(self.push_socket, 'ORDERS')
+        data = self._request_and_wait(self.push_socket, "ORDERS")
         return self._parse_orders(data)
 
     def _parse_orders(self, data):
-        raws = data.split(';')
+        raws = data.split(";")
         orders = []
         for raw in raws:
             if not raw:
@@ -448,30 +456,28 @@ class MetaTrader():
 
     def _parse_order(self, raw):
         order = self._parse_data_dict(raw, self._order_format)
-        order['open_time'] = order['open_time'] * 1000
-        order['close_time'] = order['close_time'] * 1000
-        order['expiration'] = order['expiration'] * 1000
+        order["open_time"] = order["open_time"] * 1000
+        order["close_time"] = order["close_time"] * 1000
+        order["expiration"] = order["expiration"] * 1000
         return order
 
-    def open_order(self, symbol, type, lots, price, sl=0, tp=0, comment=''):
+    def open_order(self, symbol, type, lots, price, sl=0, tp=0, comment=""):
         request = f"{symbol};{type};{lots};{price or 0};{sl or 0};{tp or 0};{comment}"
-        ticket = self._request_and_wait(self.push_socket, 'OPEN_ORDER',
-                                        request)
+        ticket = self._request_and_wait(self.push_socket, "OPEN_ORDER", request)
         return int(ticket)
 
     def modify_order(self, ticket, price, sl=0, tp=0, expiration=0):
         request = f"{ticket};{price or 0};{sl or 0};{tp or 0};{expiration or 0}"
-        data = self._request_and_wait(self.push_socket, 'MODIFY_ORDER',
-                                      request)
+        data = self._request_and_wait(self.push_socket, "MODIFY_ORDER", request)
         return True
 
     def cancel_order(self, ticket):
-        self._request_and_wait(self.push_socket, 'CANCEL_ORDER', ticket)
+        self._request_and_wait(self.push_socket, "CANCEL_ORDER", ticket)
         return True
 
-    ### helpers
+    # helpers
     def _parse_data_dict(self, data, format):
-        raws = data.split('|')
+        raws = data.split("|")
         result = dict()
         for raw in raws:
             key, val = raw.split("=", 1)
@@ -479,6 +485,8 @@ class MetaTrader():
             try:
                 result[key] = type(val)
             except:
-                raise RuntimeError(f"Cannot parse value {val} by key {key}, "
-                                   f"type {type} for data {data}")
+                raise RuntimeError(
+                    f"Cannot parse value {val} by key {key}, "
+                    f"type {type} for data {data}"
+                )
         return result

@@ -51,10 +51,11 @@ class MTMarkets {
   string             symbols[];
   Instrument         instruments[];
 
-  void               parseRate(MqlRates &rate, string &result, bool suffix);
-  void               parseMarket(string symbol, string &result, bool suffix);
-  void               parseQuote(string symbol, string &result, bool suffix);
+  void               parseRate(string &result, MqlRates &rate, bool prefix);
+  void               parseMarket(string symbol, string &result, bool prefix);
+  void               parseQuote(string symbol, string &result, bool prefix);
   string             getMarketSessions(string symbol);
+  void               barBuilding(string &result, string symbol, ENUM_TIMEFRAMES period, MqlRates &rate, bool prefix);
 
  public:
   void               MTMarkets();
@@ -102,7 +103,7 @@ bool MTMarkets::getMarkets(string &result) {
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-void MTMarkets::parseMarket(string symbol, string &result, bool suffix = false) {
+void MTMarkets::parseMarket(string symbol, string &result, bool prefix = false) {
 #ifdef __MQL4__
   string desc = SymbolInfoString(symbol, SYMBOL_DESCRIPTION);
   string currencyBase = SymbolInfoString(symbol, SYMBOL_CURRENCY_BASE);
@@ -140,6 +141,9 @@ void MTMarkets::parseMarket(string symbol, string &result, bool suffix = false) 
   double tickvalue = SymbolInfoDouble(symbol, SYMBOL_TRADE_TICK_VALUE);
 #endif
 
+  if (prefix)
+    StringAdd(result, ";");
+
   StringAdd(result, StringFormat("symbol=%s", symbol));
   StringAdd(result, StringFormat("|description=%s", desc));
   StringAdd(result, StringFormat("|exchange=%s", exchange));
@@ -159,8 +163,6 @@ void MTMarkets::parseMarket(string symbol, string &result, bool suffix = false) 
   StringAdd(result, StringFormat("|ticksize=%g", ticksize));
   StringAdd(result, StringFormat("|tickvalue=%g", tickvalue));
   StringAdd(result, StringFormat("|session=%s", this.getMarketSessions(symbol)));
-  if (suffix)
-    StringAdd(result, ";");
 }
 
 //+------------------------------------------------------------------+
@@ -266,7 +268,7 @@ bool MTMarkets::getLastQuotes(string &result) {
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-void MTMarkets::parseQuote(string symbol, string &result, bool suffix = false) {
+void MTMarkets::parseQuote(string symbol, string &result, bool prefix = false) {
 #ifdef __MQL4__
   double bid = MarketInfo(symbol, MODE_BID);
   double ask = MarketInfo(symbol, MODE_ASK);
@@ -299,6 +301,9 @@ void MTMarkets::parseQuote(string symbol, string &result, bool suffix = false) {
   if (prevClose > 0)
     changePercent = (close - prevClose) / prevClose * 100;
 
+  if (prefix)
+    StringAdd(result, ";");
+
   StringAdd(result, StringFormat("symbol=%s", symbol));
   StringAdd(result, StringFormat("|open=%g", open));
   StringAdd(result, StringFormat("|high=%g", high));
@@ -312,9 +317,6 @@ void MTMarkets::parseQuote(string symbol, string &result, bool suffix = false) {
   StringAdd(result, StringFormat("|prev_close=%g", prevClose));
   StringAdd(result, StringFormat("|change=%g", change));
   StringAdd(result, StringFormat("|change_percent=%g", changePercent));
-
-  if (suffix)
-    StringAdd(result, ";");
 }
 
 //+------------------------------------------------------------------+
@@ -347,14 +349,15 @@ bool MTMarkets::getBars(string symbol, ENUM_TIMEFRAMES period, datetime startTim
 
 // add history to response string
   for (int i = 0; i < ratesCount; i++) {
-    this.parseRate(rates[i], result, i < ratesCount - 1);
+    this.parseRate(result, rates[i], i > 0);
   }
+
+// add bar building status
+  this.barBuilding(result, symbol, period, rates[ratesCount - 1], true);
+
   return true;
 }
-
-//+------------------------------------------------------------------+
-//|                                                                  |
-//+------------------------------------------------------------------+
+//
 bool MTMarkets::subscribeBar(string symbol, ENUM_TIMEFRAMES period) {
   if (!MarketIsOpen(symbol))
     return false;
@@ -369,9 +372,7 @@ bool MTMarkets::subscribeBar(string symbol, ENUM_TIMEFRAMES period) {
   this.instruments[size].setup(symbol, period);
   return true;
 }
-//+------------------------------------------------------------------+
-//|                                                                  |
-//+------------------------------------------------------------------+
+//
 bool MTMarkets::unsubscribeBar(string symbol, ENUM_TIMEFRAMES period) {
   int size = ArraySize(this.instruments);
   bool shift = false;
@@ -396,22 +397,15 @@ bool MTMarkets::unsubscribeBar(string symbol, ENUM_TIMEFRAMES period) {
   }
   return true;
 }
-
-//+------------------------------------------------------------------+
-//|                                                                  |
-//+------------------------------------------------------------------+
+//
 bool MTMarkets::hasBarSubscribers(void) {
   return ArraySize(this.instruments) > 0;
 }
-//+------------------------------------------------------------------+
-//|                                                                  |
-//+------------------------------------------------------------------+
+//
 void MTMarkets::clearBarSubscribers(void) {
   ArrayResize(this.instruments, 0);
 }
-//+------------------------------------------------------------------+
-//|                                                                  |
-//+------------------------------------------------------------------+
+//
 bool MTMarkets::getLastBars(string &result) {
   MqlRates rates[1];
   int total = ArraySize(this.instruments);
@@ -423,15 +417,14 @@ bool MTMarkets::getLastBars(string &result) {
     StringAdd(result, StringFormat("%s|%s|",
                                    instrument.getSymbol(),
                                    GetTimeframeText(instrument.getTimeframe())));
-    this.parseRate(rates[0], result, i > 0);
+    this.parseRate(result, rates[0], i > 0);
   }
   return true;
 }
-
-//+------------------------------------------------------------------+
-//|                                                                  |
-//+------------------------------------------------------------------+
-void MTMarkets::parseRate(MqlRates &rate, string &result, bool suffix = false) {
+//
+void MTMarkets::parseRate(string &result, MqlRates &rate, bool prefix = true) {
+  if (prefix)
+    StringAdd(result, ";");
   StringAdd(result, StringFormat("%f|%g|%g|%g|%g|%g|%g|%g",
                                  rate.time,
                                  rate.open,
@@ -441,7 +434,17 @@ void MTMarkets::parseRate(MqlRates &rate, string &result, bool suffix = false) {
                                  rate.tick_volume,
                                  rate.spread,
                                  rate.real_volume));
-  if (suffix)
+}
+
+//
+void MTMarkets::barBuilding(string &result, string symbol, ENUM_TIMEFRAMES period, MqlRates &rate, bool prefix = true) {
+  long lastBarTime = SeriesInfoInteger(symbol, period, SERIES_LASTBAR_DATE);
+  if (lastBarTime != rate.time)
+    return;
+
+  if (prefix)
     StringAdd(result, ";");
+
+  StringAdd(result, "building");
 }
 //+------------------------------------------------------------------+
