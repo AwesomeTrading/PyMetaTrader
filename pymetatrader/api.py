@@ -17,6 +17,7 @@ def random_id(length=6):
 class MetaTrader:
     wait_timeout = 10000
     waiters = dict()
+    q_sub: queue.Queue
 
     def __init__(
         self,

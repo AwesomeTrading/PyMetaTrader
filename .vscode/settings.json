@@ -1,15 +1,2 @@
 {
-    "files.associations": {
-        "*.mqh": "cpp",
-        "*.mq4": "cpp",
-        "*.mq5": "cpp",
-        "array": "cpp",
-        "compare": "cpp",
-        "functional": "cpp",
-        "tuple": "cpp",
-        "type_traits": "cpp",
-        "utility": "cpp",
-        "atomic": "cpp",
-        "system_error": "cpp"
-    }
 }
