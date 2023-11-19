@@ -20,7 +20,7 @@ void MTServer::flushMarketSubscriptions() {
 //|                                                                  |
 //+------------------------------------------------------------------+
 bool MTServer::publicSubscriptionBars() {
-  if (!this.markets.hasBarSubscribers())
+  if(!this.markets.hasBarSubscribers())
     return true;
 
   string result = "BARS ";
@@ -32,7 +32,7 @@ bool MTServer::publicSubscriptionBars() {
 //|                                                                  |
 //+------------------------------------------------------------------+
 bool MTServer::publicSubscriptionQuotes() {
-  if (!this.markets.hasQuoteSubscribers())
+  if(!this.markets.hasQuoteSubscribers())
     return true;
 
   string result = "QUOTES ";
@@ -291,6 +291,8 @@ bool MTServer::processRequestDeals(string &params[]) {
 bool MTServer::publicRequestRefreshTrades(datetime fromDate, datetime toDate) {
 // datetime fromDate = TimestampToGMTTime(fromTime);
 // datetime toDate = TimestampToGMTTime(toTime);
+
+  this.account.refresh();
 
 // History orders
   string historyOrders = "HISTORY_ORDERS ";

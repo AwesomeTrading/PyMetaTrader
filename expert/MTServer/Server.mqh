@@ -117,7 +117,7 @@ void MTServer::MTServer(ulong magic, int deviation, int portStart) {
 
   this.tradeRefreshAt = 0;
   this.tradeRefreshStart = this.getOrdersMinTime();
-  if (this.tradeRefreshStart == 0)
+  if(this.tradeRefreshStart == 0)
     this.tradeRefreshStart = TimeTradeServer();
 }
 //+------------------------------------------------------------------+
@@ -157,7 +157,7 @@ void MTServer::onTrade(void) {
 //+------------------------------------------------------------------+
 bool MTServer::startSockets(void) {
 // Client
-  if (!clientPushSocket.bind(this.url_pull)) {
+  if(!clientPushSocket.bind(this.url_pull)) {
     PrintFormat("[CLIENT PUSH] ####ERROR#### Binding MTServer to %s", this.url_pull);
     return false;
   } else {
@@ -166,7 +166,7 @@ bool MTServer::startSockets(void) {
     this.clientPushSocket.setLinger(0);
   }
 
-  if (!this.clientPullSocket.bind(this.url_push)) {
+  if(!this.clientPullSocket.bind(this.url_push)) {
     PrintFormat("[CLIENT PULL] ####ERROR#### Binding MTServer to %s", this.url_push);
     return false;
   } else {
@@ -175,7 +175,7 @@ bool MTServer::startSockets(void) {
     this.clientPullSocket.setLinger(0);
   }
 
-  if (!this.clientPubSocket.bind(this.url_pub)) {
+  if(!this.clientPubSocket.bind(this.url_pub)) {
     PrintFormat("[CLIENT PUB] ####ERROR#### Binding MTServer to %s", this.url_pub);
     return false;
   } else {
@@ -205,7 +205,7 @@ bool MTServer::stopSockets(void) {
 //|                                                                  |
 //+------------------------------------------------------------------+
 void MTServer::checkRequest(Socket &socket, bool prefix = false) {
-  if (IsStopped())
+  if(IsStopped())
     return;
 
   ZmqMsg request;
@@ -213,13 +213,13 @@ void MTServer::checkRequest(Socket &socket, bool prefix = false) {
 // Get client's response, but don't block.
   socket.recv(request, true);
 
-  if (request.size() == 0)
+  if(request.size() == 0)
     return;
 
 // Message components for later.
   string params[10];
   string message = request.getData();
-  if (prefix) {
+  if(prefix) {
     int idx = StringFind(message, " ");
     message = StringSubstr(message, idx + 1);
   }
@@ -238,7 +238,7 @@ void MTServer::checkRequest(Socket &socket, bool prefix = false) {
 bool MTServer::requestReply(string &id, string &message) {
   int errorCode = GetLastError();
   string msg;
-  if (errorCode == 0) {
+  if(errorCode == 0) {
     msg = StringFormat("OK|%s|", id);
     StringAdd(msg, message);
   } else {
@@ -256,7 +256,7 @@ bool MTServer::reply(Socket &socket, string message) {
   Print("<- Reply: " + message);
   ZmqMsg msg(message);
   bool ok = socket.send(msg, true);  // NON-BLOCKING
-  if (!ok)
+  if(!ok)
     Print("[ERROR] Cannot send data to socket");
   return ok;
 }
@@ -268,52 +268,52 @@ bool MTServer::processRequest(string &params[]) {
   string action = params[0];
 
 // ping
-  if (action == "PING")
+  if(action == "PING")
     return this.processRequestPing(params);
 
 // markets
-  if (action == "BARS")
+  if(action == "BARS")
     return this.processRequestBars(params);
-  if (action == "QUOTES")
+  if(action == "QUOTES")
     return this.processRequestQuotes(params);
-  if (action == "MARKETS")
+  if(action == "MARKETS")
     return this.processRequestMarkets(params);
-  if (action == "TIME")
+  if(action == "TIME")
     return this.processRequestTime(params);
-  if (action == "SUB_BARS")
+  if(action == "SUB_BARS")
     return this.processRequestSubBars(params);
-  if (action == "UNSUB_BARS")
+  if(action == "UNSUB_BARS")
     return this.processRequestUnsubBars(params);
-  if (action == "SUB_QUOTES")
+  if(action == "SUB_QUOTES")
     return this.processRequestSubQuotes(params);
-  if (action == "UNSUB_QUOTES")
+  if(action == "UNSUB_QUOTES")
     return this.processRequestUnsubQuotes(params);
-  if (action == "UNSUB_ALL")
+  if(action == "UNSUB_ALL")
     return this.processRequestUnsubAll(params);
 
 // account
-  if (action == "ACCOUNT")
+  if(action == "ACCOUNT")
     return this.processRequestAccount(params);
-  if (action == "FUND")
+  if(action == "FUND")
     return this.processRequestFund(params);
 
-  if (action == "ORDERS")
+  if(action == "ORDERS")
     return this.processRequestOrders(params);
-  if (action == "OPEN_ORDER")
+  if(action == "OPEN_ORDER")
     return this.processRequestOpenOrder(params);
-  if (action == "MODIFY_ORDER")
+  if(action == "MODIFY_ORDER")
     return this.processRequestModifyOrder(params);
-  if (action == "CANCEL_ORDER")
+  if(action == "CANCEL_ORDER")
     return this.processRequestCancelOrder(params);
 
-  if (action == "TRADES")
+  if(action == "TRADES")
     return this.processRequestTrades(params);
-  if (action == "MODIFY_TRADE")
+  if(action == "MODIFY_TRADE")
     return this.processRequestModifyTrade(params);
-  if (action == "CLOSE_TRADE")
+  if(action == "CLOSE_TRADE")
     return this.processRequestCloseTrade(params);
 
-  if (action == "DEALS")
+  if(action == "DEALS")
     return this.processRequestDeals(params);
 
   return false;
@@ -323,7 +323,7 @@ bool MTServer::processRequest(string &params[]) {
 //| SUBSCRIBERS                                                      |
 //+------------------------------------------------------------------+
 void MTServer::checkMarketSubscriptions() {
-  if (this.flushSubscriptionsAt > TimeTradeServer())
+  if(this.flushSubscriptionsAt > TimeTradeServer())
     return;
 
   this.flushMarketSubscriptions();
@@ -341,9 +341,9 @@ void MTServer::updateRefreshTrades(void) {
 //|                                                                  |
 //+------------------------------------------------------------------+
 void MTServer::checkRefreshTrades(void) {
-  if (this.tradeRefreshAt == 0)
+  if(this.tradeRefreshAt == 0)
     return;
-  if (this.tradeRefreshAt > TimeTradeServer())
+  if(this.tradeRefreshAt > TimeTradeServer())
     return;
 
   this.doRefreshTrades();
@@ -359,7 +359,7 @@ void MTServer::doRefreshTrades(void) {
 
 // Refresh params
   this.tradeRefreshStart = this.getOrdersMinTime();
-  if (this.tradeRefreshStart == 0)
+  if(this.tradeRefreshStart == 0)
     this.tradeRefreshStart = now;
 }
 
@@ -368,11 +368,11 @@ void MTServer::doRefreshTrades(void) {
 //+------------------------------------------------------------------+
 datetime MTServer::getOrdersMinTime(void) {
   int total = OrdersTotal();
-  if (total == 0)
+  if(total == 0)
     return 0;
 
 #ifdef __MQL5__
-  if (OrderGetTicket(0))
+  if(OrderGetTicket(0))
     return (datetime)OrderGetInteger(ORDER_TIME_SETUP);
 #endif
 
