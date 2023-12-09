@@ -264,6 +264,9 @@ class MetaTrader:
         lotsize=float,
         ticksize=float,
         tickvalue=float,
+        swaplong=float,
+        swapshort=float,
+        swaprollover=int,
     )
 
     def _parse_market(self, raw):

@@ -139,6 +139,9 @@ void MTMarkets::parseMarket(string &result, string symbol, bool prefix = false) 
   double lotsize = SymbolInfoDouble(symbol, SYMBOL_TRADE_CONTRACT_SIZE);
   double ticksize = SymbolInfoDouble(symbol, SYMBOL_TRADE_TICK_SIZE);
   double tickvalue = SymbolInfoDouble(symbol, SYMBOL_TRADE_TICK_VALUE);
+  double swapLong = SymbolInfoDouble(symbol, SYMBOL_SWAP_LONG);
+  double swapShort = SymbolInfoDouble(symbol, SYMBOL_SWAP_SHORT);
+  long swapRollover = SymbolInfoInteger(symbol, SYMBOL_SWAP_ROLLOVER3DAYS);
 #endif
 
   if (prefix)
@@ -162,6 +165,9 @@ void MTMarkets::parseMarket(string &result, string symbol, bool prefix = false) 
   StringAdd(result, StringFormat("|lotsize=%g", lotsize));
   StringAdd(result, StringFormat("|ticksize=%g", ticksize));
   StringAdd(result, StringFormat("|tickvalue=%g", tickvalue));
+  StringAdd(result, StringFormat("|swaplong=%g", swapLong));
+  StringAdd(result, StringFormat("|swapshort=%g", swapShort));
+  StringAdd(result, StringFormat("|swaprollover=%g", swapRollover));
   StringAdd(result, StringFormat("|session=%s", this.getMarketSessions(symbol)));
 }
 
@@ -182,8 +188,8 @@ string MTMarkets::getMarketSessions(string symbol) {
       if (result != "")
         StringAdd(result, "!");
 
-      StringAdd(result, StringFormat("%s~%d-%d",
-                                     EnumToString(day),
+      StringAdd(result, StringFormat("%g~%d-%d",
+                                     day,
                                      openSession,
                                      closeSession));
       session++;

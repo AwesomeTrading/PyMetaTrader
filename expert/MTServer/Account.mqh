@@ -122,7 +122,9 @@ bool MTAccount::getFund(string &result) {
 //|                                                                  |
 //+------------------------------------------------------------------+
 void MTAccount::refresh(void) {
+#ifdef __MQL5__
   this.m_symbol.Refresh();
+#endif
 }
 //+------------------------------------------------------------------+
 //| ORDERS                                                           |
