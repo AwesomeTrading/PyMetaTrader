@@ -1,10 +1,10 @@
-import zmq
 import queue
-import threading
 import random
 import string
-from datetime import datetime, timezone
+import threading
 from time import sleep
+
+import zmq
 
 
 def random_id(length=6):
@@ -321,8 +321,18 @@ class MetaTrader:
         data = self._request_and_wait(self.push_socket, "UNSUB_QUOTES", symbol)
         return True
 
-    # ACCOUNT
-    # account
+    # ---- Ticks
+    def subscribe_ticks(self, *symbols):
+        request = ";".join(symbols)
+        ok = self._request_and_wait(self.push_socket, "SUB_TICKS", request)
+        return True
+
+    def unsubscribe_ticks(self, symbol):
+        ok = self._request_and_wait(self.push_socket, "UNSUB_TICKS", symbol)
+        return True
+
+    # ---- ACCOUNT ----
+    # ---- Account
     def get_account(self):
         data = self._request_and_wait(self.push_socket, "ACCOUNT")
         return self._parse_account(data)
@@ -338,7 +348,7 @@ class MetaTrader:
     def _parse_account(self, raw):
         return self._parse_data_dict(raw, self._account_format)
 
-    # fund
+    # ---- Fund
     def get_fund(self):
         data = self._request_and_wait(self.push_socket, "FUND")
         return self._parse_fund(data)
@@ -352,7 +362,7 @@ class MetaTrader:
         fund = self._parse_data_dict(raw, self._fund_format)
         return fund
 
-    # trades
+    # ---- Trades
     def get_trades(self, symbol=""):
         data = self._request_and_wait(self.push_socket, "TRADES", symbol)
         return self._parse_trades(data)
@@ -393,7 +403,7 @@ class MetaTrader:
         trade["open_time"] = trade["open_time"] * 1000
         return trade
 
-    # deals
+    # ---- Deals
     def get_deals(self, symbol="", fromdate=0):
         request = "{};{}".format(symbol, fromdate)
         data = self._request_and_wait(self.push_socket, "DEALS", request)
@@ -432,7 +442,7 @@ class MetaTrader:
         deal["time"] = deal["time"] * 1000
         return deal
 
-    # orders
+    # ---- Orders
     def get_open_orders(self):
         data = self._request_and_wait(self.push_socket, "ORDERS")
         return self._parse_orders(data)

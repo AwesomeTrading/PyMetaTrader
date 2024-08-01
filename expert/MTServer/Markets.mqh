@@ -36,7 +36,7 @@ class Instrument {
   }
 
   int                GetRates(MqlRates &rates[], int count) {
-    if (StringLen(symbol) == 0)
+    if(StringLen(symbol) == 0)
       return 0;
 
     return CopyRates(symbol, timeframe, 0, count, rates);
@@ -49,6 +49,7 @@ class Instrument {
 class MTMarkets {
  private:
   string             symbols[];
+  string             ticks[];
   Instrument         instruments[];
 
   void               parseRate(string &result, MqlRates &rate, bool prefix);
@@ -74,6 +75,14 @@ class MTMarkets {
   bool               hasQuoteSubscribers(void);
   void               clearQuoteSubscribers(void);
   bool               getLastQuotes(string &result);
+
+  bool               getTicks(string &result);
+  bool               getLastTicks(string &result);
+  bool               subscribeTick(string symbol);
+  bool               unsubscribeTick(string symbol);
+  bool               hasTickSubscribers(void);
+  void               clearTickSubscribers(void);
+  void               parseTick(string &result, string symbol, bool prefix);
 };
 
 //+------------------------------------------------------------------+
@@ -91,10 +100,10 @@ bool MTMarkets::getMarkets(string &result) {
 #endif
 
   int total = SymbolsTotal(false);
-  if (total == 0)
+  if(total == 0)
     return true;
 
-  for (int i = 0; i < total; i++) {
+  for(int i = 0; i < total; i++) {
     string symbol = SymbolName(i, false);
     this.parseMarket(result, symbol, i > 0);
   }
@@ -144,7 +153,7 @@ void MTMarkets::parseMarket(string &result, string symbol, bool prefix = false) 
   long swapRollover = SymbolInfoInteger(symbol, SYMBOL_SWAP_ROLLOVER3DAYS);
 #endif
 
-  if (prefix)
+  if(prefix)
     StringAdd(result, ";");
 
   StringAdd(result, StringFormat("symbol=%s", symbol));
@@ -177,15 +186,15 @@ void MTMarkets::parseMarket(string &result, string symbol, bool prefix = false) 
 string MTMarkets::getMarketSessions(string symbol) {
   string result = "";
   int errorCode = GetLastError();
-  if (errorCode != 0)
+  if(errorCode != 0)
     PrintFormat("[ERROR] %s %d %s", symbol, errorCode, GetErrorDescription(errorCode));
 
   datetime openSession, closeSession;
   uint session;
-  for (ENUM_DAY_OF_WEEK day = SUNDAY; day <= SATURDAY; day++) {
+  for(ENUM_DAY_OF_WEEK day = SUNDAY; day <= SATURDAY; day++) {
     session = 0;
-    while (SymbolInfoSessionTrade(symbol, day, session, openSession, closeSession)) {
-      if (result != "")
+    while(SymbolInfoSessionTrade(symbol, day, session, openSession, closeSession)) {
+      if(result != "")
         StringAdd(result, "!");
 
       StringAdd(result, StringFormat("%g~%d-%d",
@@ -208,10 +217,10 @@ bool MTMarkets::getQuotes(string &result) {
 #endif
 
   int total = SymbolsTotal(true);
-  if (total == 0)
+  if(total == 0)
     return true;
 
-  for (int i = 0; i < total; i++) {
+  for(int i = 0; i < total; i++) {
     string symbol = SymbolName(i, true);
     this.parseQuote(result, symbol, i > 0);
   }
@@ -222,12 +231,12 @@ bool MTMarkets::getQuotes(string &result) {
 //|                                                                  |
 //+------------------------------------------------------------------+
 bool MTMarkets::subscribeQuote(string symbol) {
-  if (!MarketIsOpen(symbol))
+  if(!MarketIsOpen(symbol))
     return false;
 
   int size = ArraySize(this.symbols);
-  for (int i = 0; i < size; i++) {
-    if (this.symbols[i] == symbol)
+  for(int i = 0; i < size; i++) {
+    if(this.symbols[i] == symbol)
       return true;
   }
 
@@ -265,7 +274,7 @@ bool MTMarkets::getLastQuotes(string &result) {
 #endif
 
   int total = ArraySize(this.symbols);
-  for (int i = 0; i < total; i++) {
+  for(int i = 0; i < total; i++) {
     string symbol = this.symbols[i];
     this.parseQuote(result, symbol, i > 0);
   }
@@ -304,10 +313,10 @@ void MTMarkets::parseQuote(string &result, string symbol, bool prefix = false) {
   double prevClose = iClose(symbol, PERIOD_D1, 1);
   double change = close - prevClose;
   double changePercent = 0;
-  if (prevClose > 0)
+  if(prevClose > 0)
     changePercent = (close - prevClose) / prevClose * 100;
 
-  if (prefix)
+  if(prefix)
     StringAdd(result, ";");
 
   StringAdd(result, StringFormat("symbol=%s", symbol));
@@ -326,35 +335,122 @@ void MTMarkets::parseQuote(string &result, string symbol, bool prefix = false) {
 }
 
 //+------------------------------------------------------------------+
+//| TICKS                                                            |
+//+------------------------------------------------------------------+
+bool MTMarkets::getTicks(string &result) {
+#ifdef __MQL4__
+  RefreshRates();
+#endif
+
+  int total = SymbolsTotal(true);
+  if(total == 0)
+    return true;
+
+  for(int i = 0; i < total; i++) {
+    string symbol = SymbolName(i, true);
+    this.parseTick(result, symbol, i > 0);
+  }
+  return true;
+}
+//
+bool MTMarkets::subscribeTick(string symbol) {
+  if(!MarketIsOpen(symbol))
+    return false;
+
+  int size = ArraySize(this.ticks);
+  for(int i = 0; i < size; i++) {
+    if(this.ticks[i] == symbol)
+      return true;
+  }
+
+  ArrayResize(this.ticks, size + 1);
+  this.ticks[size] = symbol;
+  return true;
+}
+//
+bool MTMarkets::unsubscribeTick(string symbol) {
+  ArrayRemove(this.ticks, symbol);
+  return true;
+}
+//
+bool MTMarkets::hasTickSubscribers(void) {
+  return ArraySize(this.ticks) > 0;
+}
+//
+void MTMarkets::clearTickSubscribers(void) {
+  ArrayResize(this.ticks, 0);
+}
+//
+bool MTMarkets::getLastTicks(string &result) {
+#ifdef __MQL4__
+  RefreshRates();
+#endif
+
+  int total = ArraySize(this.ticks);
+  for(int i = 0; i < total; i++) {
+    string symbol = this.ticks[i];
+    this.parseTick(result, symbol, i > 0);
+  }
+  return true;
+}
+//
+void MTMarkets::parseTick(string &result, string symbol, bool prefix = false) {
+#ifdef __MQL4__
+  double bid = MarketInfo(symbol, MODE_BID);
+  double ask = MarketInfo(symbol, MODE_ASK);
+  double spread = MarketInfo(symbol, MODE_SPREAD);
+#endif
+#ifdef __MQL5__
+  MqlTick lastTick;
+  SymbolInfoTick(symbol, lastTick);
+
+  double bid = lastTick.bid;
+  double ask = lastTick.ask;
+  double spread = (double)SymbolInfoInteger(symbol, SYMBOL_SPREAD);
+#endif
+
+// bypass: skip download bar data if missing data
+  ResetLastError();
+
+  if(prefix)
+    StringAdd(result, ";");
+
+  StringAdd(result, StringFormat("symbol=%s", symbol));
+  StringAdd(result, StringFormat("|bid=%g", bid));
+  StringAdd(result, StringFormat("|ask=%g", ask));
+  StringAdd(result, StringFormat("|spread=%g", spread));
+}
+
+//+------------------------------------------------------------------+
 //| BARS                                                             |
 //+------------------------------------------------------------------+
 bool MTMarkets::getBars(string &result, string symbol, ENUM_TIMEFRAMES period, datetime startTime, datetime endTime) {
   MqlRates rates[];
   int total = 0;
-  if (endTime > TimeTradeServer())
+  if(endTime > TimeTradeServer())
     endTime = TimeTradeServer();
 
 // Handling ERR_HISTORY_WILL_UPDATED (4066) and ERR_NO_HISTORY_DATA (4073) errors.
 // For non-chart symbols and time frames MT4 often needs a few requests until the data is available.
 // But even after 10 requests it can happen that it is not available. So it is best to have the charts open.
-  for (int i = 0; i < 5; i++) {
+  for(int i = 0; i < 5; i++) {
     total = CopyRates(symbol, period, startTime, endTime, rates);
     int errorCode = GetLastError();
-    if (errorCode != 0)
+    if(errorCode != 0)
       PrintFormat("[ERROR] getBars: %d %s", errorCode, GetErrorDescription(errorCode));
 
-    if (total > 0 || (errorCode != 4066 && errorCode != 4073))
+    if(total > 0 || (errorCode != 4066 && errorCode != 4073))
       break;
 
     Sleep(200);
   }
 
 // cannot load history data
-  if (total <= 0)
+  if(total <= 0)
     return false;
 
 // add history to response string
-  for (int i = 0; i < total; i++) {
+  for(int i = 0; i < total; i++) {
     this.parseRate(result, rates[i], i > 0);
   }
 
@@ -365,12 +461,12 @@ bool MTMarkets::getBars(string &result, string symbol, ENUM_TIMEFRAMES period, d
 }
 //
 bool MTMarkets::subscribeBar(string symbol, ENUM_TIMEFRAMES period) {
-  if (!MarketIsOpen(symbol))
+  if(!MarketIsOpen(symbol))
     return false;
 
   int size = ArraySize(this.instruments);
-  for (int i = 0; i < size; i++) {
-    if (this.instruments[i].equal(symbol, period))
+  for(int i = 0; i < size; i++) {
+    if(this.instruments[i].equal(symbol, period))
       return true;
   }
 
@@ -382,23 +478,23 @@ bool MTMarkets::subscribeBar(string symbol, ENUM_TIMEFRAMES period) {
 bool MTMarkets::unsubscribeBar(string symbol, ENUM_TIMEFRAMES period) {
   int size = ArraySize(this.instruments);
   bool shift = false;
-  for (int i = 0; i < size; i++) {
+  for(int i = 0; i < size; i++) {
     Instrument instrument = this.instruments[i];
 
     // replace instrument
-    if (shift) {
+    if(shift) {
       this.instruments[i - 1] = instrument;
       continue;
     }
 
     // find instrument
-    if (instrument.equal(symbol, period)) {
+    if(instrument.equal(symbol, period)) {
       shift = true;
       continue;
     }
   }
 
-  if (shift) {
+  if(shift) {
     ArrayResize(this.instruments, size - 1);
   }
   return true;
@@ -417,10 +513,10 @@ bool MTMarkets::getLastBars(string &result) {
   int total = ArraySize(this.instruments);
 
   Instrument instrument;
-  for (int i = 0; i < total; i++) {
+  for(int i = 0; i < total; i++) {
     instrument = this.instruments[i];
     instrument.GetRates(rates, 1);
-    if (i > 0)
+    if(i > 0)
       StringAdd(result, ";");
 
     StringAdd(result, StringFormat("%s|%s|",
@@ -432,7 +528,7 @@ bool MTMarkets::getLastBars(string &result) {
 }
 //
 void MTMarkets::parseRate(string &result, MqlRates &rate, bool prefix = true) {
-  if (prefix)
+  if(prefix)
     StringAdd(result, ";");
   StringAdd(result, StringFormat("%f|%g|%g|%g|%g|%g|%g|%g",
                                  rate.time,
@@ -448,10 +544,10 @@ void MTMarkets::parseRate(string &result, MqlRates &rate, bool prefix = true) {
 //
 void MTMarkets::barBuilding(string &result, string symbol, ENUM_TIMEFRAMES period, MqlRates &rate, bool prefix = true) {
   long lastBarTime = SeriesInfoInteger(symbol, period, SERIES_LASTBAR_DATE);
-  if (lastBarTime != rate.time)
+  if(lastBarTime != rate.time)
     return;
 
-  if (prefix)
+  if(prefix)
     StringAdd(result, ";");
 
   StringAdd(result, "building");

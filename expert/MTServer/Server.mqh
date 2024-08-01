@@ -56,6 +56,7 @@ class MTServer {
   void               clearMarketSubscriptions();
   bool               publicSubscriptionBars();
   bool               publicSubscriptionQuotes();
+  bool               publicSubscriptionTicks();
   bool               processRequestUnsubAll(string &params[]);
 
   // Market
@@ -66,6 +67,10 @@ class MTServer {
   bool               processRequestQuotes(string &params[]);
   bool               processRequestSubQuotes(string &params[]);
   bool               processRequestUnsubQuotes(string &params[]);
+
+  bool               processRequestTicks(string &params[]);
+  bool               processRequestSubTicks(string &params[]);
+  bool               processRequestUnsubTicks(string &params[]);
 
   bool               processRequestTime(string &params[]);
   bool               processRequestMarkets(string &params[]);
@@ -88,7 +93,7 @@ class MTServer {
   bool               publicRequestRefreshTrades(datetime fromDate, datetime toDate);
 
  public:
-                     MTServer(ulong magic, int deviation, int portStart);
+  MTServer(ulong magic, int deviation, int portStart);
   bool               start();
   bool               stop();
   void               onTimer();
@@ -288,6 +293,10 @@ bool MTServer::processRequest(string &params[]) {
     return this.processRequestSubQuotes(params);
   if(action == "UNSUB_QUOTES")
     return this.processRequestUnsubQuotes(params);
+  if(action == "SUB_TICKS")
+    return this.processRequestSubTicks(params);
+  if(action == "UNSUB_TICKS")
+    return this.processRequestUnsubTicks(params);
   if(action == "UNSUB_ALL")
     return this.processRequestUnsubAll(params);
 

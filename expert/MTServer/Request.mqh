@@ -41,6 +41,18 @@ bool MTServer::publicSubscriptionQuotes() {
 }
 
 //+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+bool MTServer::publicSubscriptionTicks() {
+  if(!this.markets.hasTickSubscribers())
+    return true;
+
+  string result = "TICKS ";
+  this.markets.getLastTicks(result);
+  return this.reply(clientPubSocket, result);
+}
+
+//+------------------------------------------------------------------+
 //|  PING                                                            |
 //+------------------------------------------------------------------+
 bool MTServer::processRequestPing(string &params[]) {
@@ -111,6 +123,37 @@ bool MTServer::processRequestSubQuotes(string &params[]) {
 bool MTServer::processRequestUnsubQuotes(string &params[]) {
   string symbol = params[2];
   this.markets.unsubscribeQuote(symbol);
+
+  string result = "OK";
+  return this.requestReply(params[1], result);
+}
+
+//+------------------------------------------------------------------+
+//| MARKET TICKS                                                     |
+//+------------------------------------------------------------------+
+bool MTServer::processRequestTicks(string &params[]) {
+  string result = "";
+  this.markets.getTicks(result);
+  return this.requestReply(params[1], result);
+}
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+bool MTServer::processRequestSubTicks(string &params[]) {
+  string symbol = params[2];
+  this.markets.subscribeTick(symbol);
+
+  string result = "OK";
+  return this.requestReply(params[1], result);
+}
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+bool MTServer::processRequestUnsubTicks(string &params[]) {
+  string symbol = params[2];
+  this.markets.unsubscribeTick(symbol);
 
   string result = "OK";
   return this.requestReply(params[1], result);
