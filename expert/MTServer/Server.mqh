@@ -8,7 +8,7 @@
 #include "Helper.mqh"
 #include "Markets.mqh"
 
-#define ZMQ_WATERMARK 1000
+#define ZMQ_WATERMARK 10000
 
 //+------------------------------------------------------------------+
 //|                                                                  |
