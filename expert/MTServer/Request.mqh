@@ -14,6 +14,7 @@
 void MTServer::flushMarketSubscriptions() {
   this.publicSubscriptionBars();
   this.publicSubscriptionQuotes();
+  this.publicSubscriptionTicks();
 }
 
 //+------------------------------------------------------------------+

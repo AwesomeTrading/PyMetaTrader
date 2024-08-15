@@ -51,6 +51,7 @@ class MetaTrader:
         self.sub_socket = self.context.socket(zmq.SUB)
         self.sub_socket.setsockopt_string(zmq.SUBSCRIBE, "BARS")
         self.sub_socket.setsockopt_string(zmq.SUBSCRIBE, "QUOTES")
+        self.sub_socket.setsockopt_string(zmq.SUBSCRIBE, "TICKS")
         self.sub_socket.setsockopt_string(zmq.SUBSCRIBE, "REFRESH")
         self.sub_socket.connect(f"{url}{sub_port}")
         print(f"[INIT] Connecting to METATRADER (SUB): {sub_port}")
@@ -164,6 +165,9 @@ class MetaTrader:
         if type == "QUOTES":
             return self._parse_quotes(data)
 
+        if type == "TICKS":
+            return self._parse_ticks(data)
+
         if type == "REFRESH":
             raws = data.split("\n")
             history_orders = []
@@ -192,13 +196,13 @@ class MetaTrader:
 
         raise RuntimeError(f"Cannot parse subscribe data: {type} {data}")
 
-    # MARKETS
-    # time
+    # ----- MARKETS -----
+    # --- Time
     def get_time(self):
         data = self._request_and_wait(self.push_socket, "TIME")
         return float(data)
 
-    # bars
+    # --- Bars
     def subscribe_bars(self, symbol, timeframe):
         request = "{};{}".format(symbol, timeframe)
         data = self._request_and_wait(self.push_socket, "SUB_BARS", request)
@@ -241,7 +245,7 @@ class MetaTrader:
             bar[i] = float(bar[i])
         return bar
 
-    # symbols
+    # --- Symbols
     def get_markets(self):
         data = self._request_and_wait(self.push_socket, "MARKETS")
         return self._parse_markets(data)
@@ -274,7 +278,7 @@ class MetaTrader:
         market["id"] = market["symbol"]
         return market
 
-    # quote
+    # --- Quote
     def get_quotes(self, symbols=[]):
         quotes = self._request_and_wait(self.push_socket, "QUOTES")
         quotes = self._parse_quotes(quotes)
@@ -330,6 +334,24 @@ class MetaTrader:
     def unsubscribe_ticks(self, symbol):
         ok = self._request_and_wait(self.push_socket, "UNSUB_TICKS", symbol)
         return True
+
+    def _parse_ticks(self, data):
+        raws = data.split(";")
+        ticks = []
+        for raw in raws:
+            ticks.append(self._parse_tick(raw))
+        return ticks
+
+    _tick_format = dict(
+        bid=float,
+        ask=float,
+        spread=float,
+        at=float,
+    )
+
+    def _parse_tick(self, raw):
+        tick = self._parse_data_dict(raw, self._tick_format)
+        return tick
 
     # ---- ACCOUNT ----
     # ---- Account

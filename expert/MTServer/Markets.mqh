@@ -406,6 +406,7 @@ void MTMarkets::parseTick(string &result, string symbol, bool prefix = false) {
 
   double bid = lastTick.bid;
   double ask = lastTick.ask;
+  long at = lastTick.time;
   double spread = (double)SymbolInfoInteger(symbol, SYMBOL_SPREAD);
 #endif
 
@@ -419,6 +420,7 @@ void MTMarkets::parseTick(string &result, string symbol, bool prefix = false) {
   StringAdd(result, StringFormat("|bid=%g", bid));
   StringAdd(result, StringFormat("|ask=%g", ask));
   StringAdd(result, StringFormat("|spread=%g", spread));
+  StringAdd(result, StringFormat("|at=%f", at));
 }
 
 //+------------------------------------------------------------------+
