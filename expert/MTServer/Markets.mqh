@@ -231,8 +231,8 @@ bool MTMarkets::getQuotes(string &result) {
 //|                                                                  |
 //+------------------------------------------------------------------+
 bool MTMarkets::subscribeQuote(string symbol) {
-  if(!MarketIsOpen(symbol))
-    return false;
+  //if(!MarketIsOpen(symbol))
+  //  return false;
 
   int size = ArraySize(this.symbols);
   for(int i = 0; i < size; i++) {

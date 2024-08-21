@@ -222,7 +222,7 @@ void MTServer::checkRequest(Socket &socket, bool prefix = false) {
     return;
 
 // Message components for later.
-  string params[10];
+  string params[];
   string message = request.getData();
   if(prefix) {
     int idx = StringFind(message, " ");
