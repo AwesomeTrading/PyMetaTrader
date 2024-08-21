@@ -317,8 +317,9 @@ class MetaTrader:
         quote = self._parse_data_dict(raw, self._quote_format)
         return quote
 
-    def subscribe_quotes(self, symbol):
-        data = self._request_and_wait(self.push_socket, "SUB_QUOTES", symbol)
+    def subscribe_quotes(self, symbols: list[str]):
+        request = ";".join(symbols)
+        data = self._request_and_wait(self.push_socket, "SUB_QUOTES", request)
         return True
 
     def unsubscribe_quotes(self, symbol):
