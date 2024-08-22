@@ -322,8 +322,9 @@ class MetaTrader:
         data = self._request_and_wait(self.push_socket, "SUB_QUOTES", request)
         return True
 
-    def unsubscribe_quotes(self, symbol):
-        data = self._request_and_wait(self.push_socket, "UNSUB_QUOTES", symbol)
+    def unsubscribe_quotes(self, symbols: list[str]):
+        request = ";".join(symbols)
+        data = self._request_and_wait(self.push_socket, "UNSUB_QUOTES", request)
         return True
 
     # ---- Ticks

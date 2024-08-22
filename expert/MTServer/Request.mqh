@@ -127,8 +127,13 @@ bool MTServer::processRequestSubQuotes(string &params[]) {
 //|                                                                  |
 //+------------------------------------------------------------------+
 bool MTServer::processRequestUnsubQuotes(string &params[]) {
-  string symbol = params[2];
-  this.markets.unsubscribeQuote(symbol);
+  int size = ArraySize(params);
+
+  string symbol;
+  for(int i = 2; i < size; i++) {
+    symbol= params[i];
+    this.markets.unsubscribeQuote(symbol);
+  }
 
   string result = "OK";
   return this.requestReply(params[1], result);
