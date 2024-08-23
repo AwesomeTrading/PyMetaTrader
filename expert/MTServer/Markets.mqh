@@ -244,30 +244,21 @@ bool MTMarkets::subscribeQuote(string symbol) {
   this.symbols[size] = symbol;
   return true;
 }
-//+------------------------------------------------------------------+
-//|                                                                  |
-//+------------------------------------------------------------------+
+//
 bool MTMarkets::unsubscribeQuote(string symbol) {
   ArrayRemove(this.symbols, symbol);
   return true;
 }
 
-//+------------------------------------------------------------------+
-//|                                                                  |
-//+------------------------------------------------------------------+
+//
 bool MTMarkets::hasQuoteSubscribers(void) {
   return ArraySize(this.symbols) > 0;
 }
-//+------------------------------------------------------------------+
-//|                                                                  |
-//+------------------------------------------------------------------+
+//
 void MTMarkets::clearQuoteSubscribers(void) {
   ArrayResize(this.symbols, 0);
 }
-
-//+------------------------------------------------------------------+
-//|                                                                  |
-//+------------------------------------------------------------------+
+//
 bool MTMarkets::getLastQuotes(string &result) {
 #ifdef __MQL4__
   RefreshRates();
@@ -276,13 +267,15 @@ bool MTMarkets::getLastQuotes(string &result) {
   int total = ArraySize(this.symbols);
   for(int i = 0; i < total; i++) {
     string symbol = this.symbols[i];
+
+    if(!MarketIsOpen(symbol))
+      continue;
+
     this.parseQuote(result, symbol, i > 0);
   }
   return true;
 }
-//+------------------------------------------------------------------+
-//|                                                                  |
-//+------------------------------------------------------------------+
+//
 void MTMarkets::parseQuote(string &result, string symbol, bool prefix = false) {
 #ifdef __MQL4__
   double bid = MarketInfo(symbol, MODE_BID);
@@ -354,8 +347,8 @@ bool MTMarkets::getTicks(string &result) {
 }
 //
 bool MTMarkets::subscribeTick(string symbol) {
-  if(!MarketIsOpen(symbol))
-    return false;
+  //if(!MarketIsOpen(symbol))
+  //return false;
 
   int size = ArraySize(this.ticks);
   for(int i = 0; i < size; i++) {
@@ -389,6 +382,10 @@ bool MTMarkets::getLastTicks(string &result) {
   int total = ArraySize(this.ticks);
   for(int i = 0; i < total; i++) {
     string symbol = this.ticks[i];
+
+    if(!MarketIsOpen(symbol))
+      continue;
+
     this.parseTick(result, symbol, i > 0);
   }
   return true;
@@ -463,8 +460,8 @@ bool MTMarkets::getBars(string &result, string symbol, ENUM_TIMEFRAMES period, d
 }
 //
 bool MTMarkets::subscribeBar(string symbol, ENUM_TIMEFRAMES period) {
-  if(!MarketIsOpen(symbol))
-    return false;
+  //if(!MarketIsOpen(symbol))
+  //  return false;
 
   int size = ArraySize(this.instruments);
   for(int i = 0; i < size; i++) {
@@ -517,6 +514,10 @@ bool MTMarkets::getLastBars(string &result) {
   Instrument instrument;
   for(int i = 0; i < total; i++) {
     instrument = this.instruments[i];
+
+    if(!MarketIsOpen(instrument.getSymbol()))
+      continue;
+
     instrument.GetRates(rates, 1);
     if(i > 0)
       StringAdd(result, ";");

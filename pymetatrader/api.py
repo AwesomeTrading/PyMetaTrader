@@ -295,6 +295,8 @@ class MetaTrader:
         raws = data.split(";")
         quotes = []
         for raw in raws:
+            if not raw:
+                continue
             quotes.append(self._parse_quote(raw))
         return quotes
 
@@ -341,6 +343,8 @@ class MetaTrader:
         raws = data.split(";")
         ticks = []
         for raw in raws:
+            if not raw:
+                continue
             ticks.append(self._parse_tick(raw))
         return ticks
 
