@@ -1,3 +1,4 @@
+import logging
 import queue
 import random
 import string
@@ -6,12 +7,11 @@ from time import sleep
 
 import zmq
 
+logger = logging.getLogger("PyMetaTrader")
+
 
 def random_id(length=6):
-    return "".join(
-        random.SystemRandom().choice(string.ascii_uppercase + string.digits)
-        for _ in range(length)
-    )
+    return "".join(random.SystemRandom().choice(string.ascii_uppercase + string.digits) for _ in range(length))
 
 
 class MetaTrader:
@@ -39,13 +39,13 @@ class MetaTrader:
         self.push_socket = self.context.socket(zmq.PUSH)
         self.push_socket.setsockopt(zmq.SNDHWM, 1)
         self.push_socket.connect(f"{url}{push_port}")
-        print(f"[INIT] Connecting to METATRADER (PUSH): {push_port}")
+        logger.info("[INIT] Connecting to METATRADER (PUSH): %s", push_port)
 
         # Connect PULL Socket to receive command responses from MetaTrader
         self.pull_socket = self.context.socket(zmq.PULL)
         self.pull_socket.setsockopt(zmq.RCVHWM, 1)
         self.pull_socket.connect(f"{url}{pull_port}")
-        print(f"[INIT] Connecting to METATRADER (PULL): {pull_port}")
+        logger.info("[INIT] Connecting to METATRADER (PULL): %s", pull_port)
 
         # Connect SUB Socket to receive market data from MetaTrader
         self.sub_socket = self.context.socket(zmq.SUB)
@@ -54,7 +54,7 @@ class MetaTrader:
         self.sub_socket.setsockopt_string(zmq.SUBSCRIBE, "TICKS")
         self.sub_socket.setsockopt_string(zmq.SUBSCRIBE, "REFRESH")
         self.sub_socket.connect(f"{url}{sub_port}")
-        print(f"[INIT] Connecting to METATRADER (SUB): {sub_port}")
+        logger.info("[INIT] Connecting to METATRADER (SUB): %s", sub_port)
 
         # Initialize POLL set and register PULL and SUB sockets
         self.poller = zmq.Poller()
@@ -81,8 +81,8 @@ class MetaTrader:
     def _recv(self, socket) -> str:
         try:
             return socket.recv_string(zmq.NOBLOCK)
-        except zmq.error.Again:
-            print("Resource timeout.. please try again.")
+        except zmq.error.Again as e:
+            logger.exception("Resource timeout.. please try again.", exc_info=e)
 
     # PING
     def _t_ping(self):
@@ -126,9 +126,9 @@ class MetaTrader:
                     if id in self.waiters:
                         self.waiters[id].put((ok == "OK", data))
                     else:
-                        print("Abandoned message: ", msg)
+                        logger.warning("Abandoned message: %s", msg)
                 except Exception as e:
-                    print("Wait socket data error: ", e, msg)
+                    logger.exception("Wait socket data error: %s", msg, exc_info=e)
 
     def _request(self, socket, action, msg=""):
         request_id = random_id()
@@ -157,6 +157,8 @@ class MetaTrader:
             result = []
             raws = data.split(";")
             for raw in raws:
+                if not raw:
+                    continue
                 symbol, timeframe, bar = raw.split("|", 2)
                 bar = self._parse_bar(bar)
                 result.append((symbol, timeframe, bar))
@@ -529,8 +531,5 @@ class MetaTrader:
             try:
                 result[key] = type(val)
             except:
-                raise RuntimeError(
-                    f"Cannot parse value {val} by key {key}, "
-                    f"type {type} for data {data}"
-                )
+                raise RuntimeError(f"Cannot parse value {val} by key {key}, " f"type {type} for data {data}")
         return result
