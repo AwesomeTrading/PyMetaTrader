@@ -426,19 +426,16 @@ void MTMarkets::parseTick(string &result, string symbol, bool prefix = false) {
 bool MTMarkets::getBars(string &result, string symbol, ENUM_TIMEFRAMES period, datetime startTime, datetime endTime) {
   MqlRates rates[];
   int total = 0;
-  if(endTime > TimeTradeServer())
-    endTime = TimeTradeServer();
-
-// Handling ERR_HISTORY_WILL_UPDATED (4066) and ERR_NO_HISTORY_DATA (4073) errors.
-// For non-chart symbols and time frames MT4 often needs a few requests until the data is available.
-// But even after 10 requests it can happen that it is not available. So it is best to have the charts open.
-  for(int i = 0; i < 5; i++) {
+  for(int i = 0; i < 20; i++) {
     total = CopyRates(symbol, period, startTime, endTime, rates);
     int errorCode = GetLastError();
     if(errorCode != 0)
       PrintFormat("[ERROR] getBars: %d %s", errorCode, GetErrorDescription(errorCode));
 
-    if(total > 0 || (errorCode != 4066 && errorCode != 4073))
+    if(total > 0)
+      break;
+
+    if(i > 3 && endTime < TimeTradeServer())
       break;
 
     Sleep(200);
