@@ -435,7 +435,8 @@ bool MTMarkets::getBars(string &result, string symbol, ENUM_TIMEFRAMES period, d
     if(total > 0)
       break;
 
-    if(i > 3 && endTime < TimeTradeServer())
+// Break if not is neared data
+    if(i > 2 && endTime < TimeTradeServer() - 10 * period * 60)
       break;
 
     Sleep(200);
