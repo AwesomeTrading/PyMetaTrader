@@ -21,7 +21,7 @@ void MTServer::flushMarketSubscriptions() {
 //|                                                                  |
 //+------------------------------------------------------------------+
 bool MTServer::publicSubscriptionBars() {
-  if(!this.markets.hasBarSubscribers())
+  if (!this.markets.hasBarSubscribers())
     return true;
 
   string result = "BARS ";
@@ -33,7 +33,7 @@ bool MTServer::publicSubscriptionBars() {
 //|                                                                  |
 //+------------------------------------------------------------------+
 bool MTServer::publicSubscriptionQuotes() {
-  if(!this.markets.hasQuoteSubscribers())
+  if (!this.markets.hasQuoteSubscribers())
     return true;
 
   string result = "QUOTES ";
@@ -45,7 +45,7 @@ bool MTServer::publicSubscriptionQuotes() {
 //|                                                                  |
 //+------------------------------------------------------------------+
 bool MTServer::publicSubscriptionTicks() {
-  if(!this.markets.hasTickSubscribers())
+  if (!this.markets.hasTickSubscribers())
     return true;
 
   string result = "TICKS ";
@@ -56,317 +56,305 @@ bool MTServer::publicSubscriptionTicks() {
 //+------------------------------------------------------------------+
 //|  PING                                                            |
 //+------------------------------------------------------------------+
-bool MTServer::processRequestPing(string &params[]) {
-  string result = "PONG";
-  return this.requestReply(params[1], result);
+bool MTServer::processRequestPing(string &params[], string &response) {
+  response += "PONG";
+  return true;
 }
 
 //+------------------------------------------------------------------+
 //| MARKET BARS                                                      |
 //+------------------------------------------------------------------+
-bool MTServer::processRequestBars(string &params[]) {
-  string symbol = params[2];
-  ENUM_TIMEFRAMES period = GetTimeframe(params[3]);
-  datetime startTime = TimestampToGMTTime(params[4]);
-  datetime endTime = TimestampToGMTTime(params[5]);
+bool MTServer::processRequestBars(string &params[], string &response) {
+  string symbol = params[1];
+  ENUM_TIMEFRAMES period = GetTimeframe(params[2]);
+  datetime startTime = TimestampToGMTTime(params[3]);
+  datetime endTime = TimestampToGMTTime(params[4]);
 
-  string result = "";
-  this.markets.getBars(result, symbol, period, startTime, endTime);
-  return this.requestReply(params[1], result);
+  this.markets.getBars(response, symbol, period, startTime, endTime);
+  return true;
 }
 
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-bool MTServer::processRequestSubBars(string &params[]) {
-  string symbol = params[2];
-  ENUM_TIMEFRAMES period = GetTimeframe(params[3]);
+bool MTServer::processRequestSubBars(string &params[], string &response) {
+  string symbol = params[1];
+  ENUM_TIMEFRAMES period = GetTimeframe(params[2]);
   this.markets.subscribeBar(symbol, period);
-  string result = "OK";
-  return this.requestReply(params[1], result);
+
+  response += "OK";
+  return true;
 }
 
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-bool MTServer::processRequestUnsubBars(string &params[]) {
-  string symbol = params[2];
-  ENUM_TIMEFRAMES period = GetTimeframe(params[3]);
+bool MTServer::processRequestUnsubBars(string &params[], string &response) {
+  string symbol = params[1];
+  ENUM_TIMEFRAMES period = GetTimeframe(params[2]);
   this.markets.unsubscribeBar(symbol, period);
 
-  string result = "OK";
-  return this.requestReply(params[1], result);
+  response += "OK";
+  return true;
 }
 
 //+------------------------------------------------------------------+
 //| MARKET QUOTES                                                    |
 //+------------------------------------------------------------------+
-bool MTServer::processRequestQuotes(string &params[]) {
-  string result = "";
-  this.markets.getQuotes(result);
-  return this.requestReply(params[1], result);
+bool MTServer::processRequestQuotes(string &params[], string &response) {
+  this.markets.getQuotes(response);
+  return true;
 }
 
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-bool MTServer::processRequestSubQuotes(string &params[]) {
+bool MTServer::processRequestSubQuotes(string &params[], string &response) {
   int size = ArraySize(params);
 
   string symbol;
-  for(int i = 2; i < size; i++) {
-    symbol= params[i];
+  for (int i = 2; i < size; i++) {
+    symbol = params[i];
     this.markets.subscribeQuote(symbol);
   }
 
-  string result = "OK";
-  return this.requestReply(params[1], result);
+  response += "OK";
+  return true;
 }
 
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-bool MTServer::processRequestUnsubQuotes(string &params[]) {
+bool MTServer::processRequestUnsubQuotes(string &params[], string &response) {
   int size = ArraySize(params);
 
   string symbol;
-  for(int i = 2; i < size; i++) {
-    symbol= params[i];
+  for (int i = 2; i < size; i++) {
+    symbol = params[i];
     this.markets.unsubscribeQuote(symbol);
   }
 
-  string result = "OK";
-  return this.requestReply(params[1], result);
+  response += "OK";
+  return true;
 }
 
 //+------------------------------------------------------------------+
 //| MARKET TICKS                                                     |
 //+------------------------------------------------------------------+
-bool MTServer::processRequestTicks(string &params[]) {
-  string result = "";
-  this.markets.getTicks(result);
-  return this.requestReply(params[1], result);
+bool MTServer::processRequestTicks(string &params[], string &response) {
+  this.markets.getTicks(response);
+  return true;
 }
 
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-bool MTServer::processRequestSubTicks(string &params[]) {
-  string symbol = params[2];
+bool MTServer::processRequestSubTicks(string &params[], string &response) {
+  string symbol = params[1];
   this.markets.subscribeTick(symbol);
 
-  string result = "OK";
-  return this.requestReply(params[1], result);
+  response += "OK";
+  return true;
 }
 
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-bool MTServer::processRequestUnsubTicks(string &params[]) {
-  string symbol = params[2];
+bool MTServer::processRequestUnsubTicks(string &params[], string &response) {
+  string symbol = params[1];
   this.markets.unsubscribeTick(symbol);
 
-  string result = "OK";
-  return this.requestReply(params[1], result);
+  response += "OK";
+  return true;
 }
 
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-bool MTServer::processRequestUnsubAll(string &params[]) {
+bool MTServer::processRequestUnsubAll(string &params[], string &response) {
   Print("Clear all subscribers");
 
   this.markets.clearBarSubscribers();
   this.markets.clearQuoteSubscribers();
 
-// Unsubscribe and doesn't response anything
+  // Unsubscribe and doesn't response anything
   return true;
 }
 
 //+------------------------------------------------------------------+
 //| MARKET TIME                                                      |
 //+------------------------------------------------------------------+
-bool MTServer::processRequestTime(string &params[]) {
-  string result = StringFormat("%f", TimeTradeServer());
-  return this.requestReply(params[1], result);
+bool MTServer::processRequestTime(string &params[], string &response) {
+  response += StringFormat("%f", TimeTradeServer());
+  return true;
 }
 
 //+------------------------------------------------------------------+
 //| MARKETS                                                          |
 //+------------------------------------------------------------------+
-bool MTServer::processRequestMarkets(string &params[]) {
-  string result = "";
-  this.markets.getMarkets(result);
-  return this.requestReply(params[1], result);
+bool MTServer::processRequestMarkets(string &params[], string &response) {
+  this.markets.getMarkets(response);
+  return true;
 }
 
 //+------------------------------------------------------------------+
 //| ACCOUNT                                                          |
 //+------------------------------------------------------------------+
-bool MTServer::processRequestAccount(string &params[]) {
-  string result = "";
-  this.account.getAccount(result);
-  return this.requestReply(params[1], result);
+bool MTServer::processRequestAccount(string &params[], string &response) {
+  return this.account.getAccount(response);
 }
 
 //+------------------------------------------------------------------+
 //| FUND                                                             |
 //+------------------------------------------------------------------+
-bool MTServer::processRequestFund(string &params[]) {
-  string result = "";
-  this.account.getFund(result);
-  return this.requestReply(params[1], result);
+bool MTServer::processRequestFund(string &params[], string &response) {
+  this.account.getFund(response);
+  return true;
 }
 
 //+------------------------------------------------------------------+
 //| ORDERS                                                           |
 //+------------------------------------------------------------------+
-bool MTServer::processRequestOrders(string &params[]) {
+bool MTServer::processRequestOrders(string &params[], string &response) {
   string symbol = params[2];
-  string result = "";
-  this.account.getOrders(result, symbol);
-  return this.requestReply(params[1], result);
+
+  this.account.getOrders(response, symbol);
+  return true;
 }
 
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-bool MTServer::processRequestOpenOrder(string &params[]) {
-  string symbol = params[2];
-  int type = StringToOperationType(params[3]);
-  double lots = StringToDouble(params[4]);
-  double price = StringToDouble(params[5]);
-  double sl = StringToDouble(params[6]);
-  double tp = StringToDouble(params[7]);
-  string comment = params[8];
+bool MTServer::processRequestOpenOrder(string &params[], string &response) {
+  string symbol = params[1];
+  int type = StringToOperationType(params[2]);
+  double lots = StringToDouble(params[3]);
+  double price = StringToDouble(params[4]);
+  double sl = StringToDouble(params[5]);
+  double tp = StringToDouble(params[6]);
+  string comment = params[7];
 
-  string result = "";
-  ulong ticket = this.account.openOrder(result, symbol, type, lots, price, sl, tp, comment);
-
-  StringAdd(result, IntegerToString(ticket));
-  return this.requestReply(params[1], result);
+  ulong ticket = this.account.openOrder(response, symbol, type, lots, price, sl, tp, comment);
+  StringAdd(response, IntegerToString(ticket));
+  return true;
 }
 
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-bool MTServer::processRequestModifyOrder(string &params[]) {
+bool MTServer::processRequestModifyOrder(string &params[], string &response) {
 #ifdef __MQL4__
-  ulong ticket = StrToInteger(params[2]);
+  ulong ticket = StrToInteger(params[1]);
 #endif
 #ifdef __MQL5__
-  ulong ticket = StringToInteger(params[2]);
+  ulong ticket = StringToInteger(params[1]);
 #endif
 
-  double price = StringToDouble(params[3]);
-  double sl = StringToDouble(params[4]);
-  double tp = StringToDouble(params[5]);
-  datetime expiration = TimestampToGMTTime(params[6]);
+  double price = StringToDouble(params[2]);
+  double sl = StringToDouble(params[3]);
+  double tp = StringToDouble(params[4]);
+  datetime expiration = TimestampToGMTTime(params[5]);
 
-// process
-  string result = "";
-  this.account.modifyOrder(result, ticket, price, sl, tp, expiration);
-  return this.requestReply(params[1], result);
+  // process
+  this.account.modifyOrder(response, ticket, price, sl, tp, expiration);
+  return true;
 }
 
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-bool MTServer::processRequestCancelOrder(string &params[]) {
+bool MTServer::processRequestCancelOrder(string &params[], string &response) {
 #ifdef __MQL4__
-  ulong ticket = StrToInteger(params[2]);
+  ulong ticket = StrToInteger(params[1]);
 #endif
 #ifdef __MQL5__
-  ulong ticket = StringToInteger(params[2]);
+  ulong ticket = StringToInteger(params[1]);
 #endif
 
-  string result = "";
-  this.account.cancelOrder(result, ticket);
-  return this.requestReply(params[1], result);
+  this.account.cancelOrder(response, ticket);
+  return true;
 }
 
 //+------------------------------------------------------------------+
 //| TRADES                                                           |
 //+------------------------------------------------------------------+
-bool MTServer::processRequestTrades(string &params[]) {
-  string symbol = params[2];
-  string result = "";
-  this.account.getTrades(result, symbol);
-  return this.requestReply(params[1], result);
+bool MTServer::processRequestTrades(string &params[], string &response) {
+  string symbol = params[1];
+
+  this.account.getTrades(response, symbol);
+  return true;
 }
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-bool MTServer::processRequestModifyTrade(string &params[]) {
+bool MTServer::processRequestModifyTrade(string &params[], string &response) {
 #ifdef __MQL4__
-  ulong ticket = StrToInteger(params[2]);
+  ulong ticket = StrToInteger(params[1]);
 #endif
 #ifdef __MQL5__
-  ulong ticket = StringToInteger(params[2]);
+  ulong ticket = StringToInteger(params[1]);
 #endif
-  double sl = StringToDouble(params[3]);
-  double tp = StringToDouble(params[4]);
+  double sl = StringToDouble(params[2]);
+  double tp = StringToDouble(params[3]);
 
-// process
-  string result = "";
-  this.account.modifyTrade(result, ticket, sl, tp);
-  return this.requestReply(params[1], result);
+  // process
+  this.account.modifyTrade(response, ticket, sl, tp);
+  return true;
 }
 
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-bool MTServer::processRequestCloseTrade(string &params[]) {
+bool MTServer::processRequestCloseTrade(string &params[], string &response) {
 #ifdef __MQL4__
-  ulong ticket = StrToInteger(params[2]);
+  ulong ticket = StrToInteger(params[1]);
 #endif
 #ifdef __MQL5__
-  ulong ticket = StringToInteger(params[2]);
+  ulong ticket = StringToInteger(params[1]);
 #endif
-  string result = "";
-  this.account.closeTrade(result, ticket);
-  return this.requestReply(params[1], result);
+
+  this.account.closeTrade(response, ticket);
+  return true;
 }
 //+------------------------------------------------------------------+
 //| DEALS                                                            |
 //+------------------------------------------------------------------+
-bool MTServer::processRequestDeals(string &params[]) {
-  string symbol = params[2];
-  datetime fromDate = TimestampToGMTTime(params[3]);
+bool MTServer::processRequestDeals(string &params[], string &response) {
+  string symbol = params[1];
+  datetime fromDate = TimestampToGMTTime(params[2]);
 
-  string result = "";
-  this.account.getHistoryDeals(result, symbol, fromDate);
-  return this.requestReply(params[1], result);
+  this.account.getHistoryDeals(response, symbol, fromDate);
+  return true;
 }
 
 //+------------------------------------------------------------------+
 //| REFRESH TRADES                                                   |
 //+------------------------------------------------------------------+
 bool MTServer::publicRequestRefreshTrades(datetime fromDate, datetime toDate) {
-// datetime fromDate = TimestampToGMTTime(fromTime);
-// datetime toDate = TimestampToGMTTime(toTime);
+  // datetime fromDate = TimestampToGMTTime(fromTime);
+  // datetime toDate = TimestampToGMTTime(toTime);
 
   this.account.refresh();
 
-// History orders
+  // History orders
   string historyOrders = "HISTORY_ORDERS ";
   this.account.getHistoryOrders(historyOrders, "", fromDate, toDate);
 
-// History deals
+  // History deals
   string historyDeals = "HISTORY_DEALS ";
   this.account.getHistoryDeals(historyDeals, "", fromDate, toDate);
 
-// Open orders
+  // Open orders
   string orders = "ORDERS ";
   this.account.getOrders(orders);
 
-// Trades
+  // Trades
   string trades = "TRADES ";
   this.account.getTrades(trades);
 
   string refresh = StringFormat("REFRESH %s\n%s\n%s\n%s", historyOrders, historyDeals, orders, trades);
 
-// Public instead of requestReply
+  // Public instead of requestReply
   return this.reply(clientPubSocket, refresh);
 }
 //+------------------------------------------------------------------+

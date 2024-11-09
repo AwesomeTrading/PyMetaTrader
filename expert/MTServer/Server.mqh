@@ -17,16 +17,11 @@ class MTServer {
  private:
   Context            *context;
 
-  Socket             *clientPushSocket;
-  Socket             *clientPullSocket;
+  Socket             *clientRequestSocket;
   Socket             *clientPubSocket;
 
   MTMarkets          *markets;
   MTAccount          *account;
-
-  string             url_push;
-  string             url_pull;
-  string             url_pub;
 
   ushort             separator;
   datetime           flushSubscriptionsAt;
@@ -34,21 +29,18 @@ class MTServer {
   datetime           tradeRefreshAt;
 
   // Connection
-  bool               startSockets();
-  bool               stopSockets();
-
   datetime           getOrdersMinTime();
   void               updateRefreshTrades();
   void               checkRefreshTrades();
   void               doRefreshTrades(void);
 
   // request
-  void               checkRequest(Socket &socket, bool prefix);
+  void               checkRequest(bool prefix);
   void               parseRequest(string &message, string &retArray[]);
   bool               requestReply(string &id, string &message);
   bool               reply(Socket &socket, string message);
-  bool               processRequest(string &compArray[]);
-  bool               processRequestPing(string &params[]);
+  bool               processRequest(string &params[], string &response);
+  bool               processRequestPing(string &params[], string &response);
 
   // subscribers
   void               checkMarketSubscriptions();
@@ -57,44 +49,44 @@ class MTServer {
   bool               publicSubscriptionBars();
   bool               publicSubscriptionQuotes();
   bool               publicSubscriptionTicks();
-  bool               processRequestUnsubAll(string &params[]);
+  bool               processRequestUnsubAll(string &params[], string &response);
 
   // Market
-  bool               processRequestBars(string &params[]);
-  bool               processRequestSubBars(string &params[]);
-  bool               processRequestUnsubBars(string &params[]);
+  bool               processRequestBars(string &params[], string &response);
+  bool               processRequestSubBars(string &params[], string &response);
+  bool               processRequestUnsubBars(string &params[], string &response);
 
-  bool               processRequestQuotes(string &params[]);
-  bool               processRequestSubQuotes(string &params[]);
-  bool               processRequestUnsubQuotes(string &params[]);
+  bool               processRequestQuotes(string &params[], string &response);
+  bool               processRequestSubQuotes(string &params[], string &response);
+  bool               processRequestUnsubQuotes(string &params[], string &response);
 
-  bool               processRequestTicks(string &params[]);
-  bool               processRequestSubTicks(string &params[]);
-  bool               processRequestUnsubTicks(string &params[]);
+  bool               processRequestTicks(string &params[], string &response);
+  bool               processRequestSubTicks(string &params[], string &response);
+  bool               processRequestUnsubTicks(string &params[], string &response);
 
-  bool               processRequestTime(string &params[]);
-  bool               processRequestMarkets(string &params[]);
+  bool               processRequestTime(string &params[], string &response);
+  bool               processRequestMarkets(string &params[], string &response);
 
   // Account
-  bool               processRequestAccount(string &params[]);
-  bool               processRequestFund(string &params[]);
+  bool               processRequestAccount(string &params[], string &response);
+  bool               processRequestFund(string &params[], string &response);
 
-  bool               processRequestOrders(string &params[]);
-  bool               processRequestOpenOrder(string &params[]);
-  bool               processRequestModifyOrder(string &params[]);
-  bool               processRequestCancelOrder(string &params[]);
+  bool               processRequestOrders(string &params[], string &response);
+  bool               processRequestOpenOrder(string &params[], string &response);
+  bool               processRequestModifyOrder(string &params[], string &response);
+  bool               processRequestCancelOrder(string &params[], string &response);
 
-  bool               processRequestTrades(string &params[]);
-  bool               processRequestModifyTrade(string &params[]);
-  bool               processRequestCloseTrade(string &params[]);
+  bool               processRequestTrades(string &params[], string &response);
+  bool               processRequestModifyTrade(string &params[], string &response);
+  bool               processRequestCloseTrade(string &params[], string &response);
 
-  bool               processRequestDeals(string &params[]);
+  bool               processRequestDeals(string &params[], string &response);
 
   bool               publicRequestRefreshTrades(datetime fromDate, datetime toDate);
 
  public:
-  MTServer(ulong magic, int deviation, int portStart);
-  bool               start();
+  MTServer(ulong magic, int deviation);
+  bool               start(string brokerRequestURL, string brokerSubcribeURL);
   bool               stop();
   void               onTimer();
   void               onTrade();
@@ -103,15 +95,9 @@ class MTServer {
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-void MTServer::MTServer(ulong magic, int deviation, int portStart) {
+void MTServer::MTServer(ulong magic, int deviation) {
   this.context = new Context(StringFormat("MTServer-%d", magic));
-
-  this.url_push = StringFormat("tcp://*:%d", portStart);
-  this.url_pull = StringFormat("tcp://*:%d", portStart + 1);
-  this.url_pub = StringFormat("tcp://*:%d", portStart + 2);
-
-  this.clientPushSocket = new Socket(this.context, ZMQ_PUSH);
-  this.clientPullSocket = new Socket(this.context, ZMQ_PULL);
+  this.clientRequestSocket = new Socket(this.context, ZMQ_REQ);
   this.clientPubSocket = new Socket(this.context, ZMQ_PUB);
 
   this.markets = new MTMarkets();
@@ -128,10 +114,31 @@ void MTServer::MTServer(ulong magic, int deviation, int portStart) {
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-bool MTServer::start(void) {
+bool MTServer::start(string brokerRequestURL, string brokerSubcribeURL) {
   Print("Start Server");
   this.context.setBlocky(false);
-  this.startSockets();
+
+
+  if(!this.clientRequestSocket.connect(brokerRequestURL)) {
+    PrintFormat("[CLIENT REQ] ####ERROR#### connect to %s", brokerRequestURL);
+    return false;
+  } else {
+    PrintFormat("[CLIENT REQ] Connected to %s",brokerRequestURL);
+    //this.clientPushSocket.setSendHighWaterMark(ZMQ_WATERMARK);
+    //this.clientPushSocket.setLinger(0);
+  }
+  /*if(!this.clientPubSocket.bind(brokerSubcribeURL)) {
+    PrintFormat("[CLIENT PUB] ####ERROR#### Binding MTServer to %s", brokerSubcribeURL);
+    return;
+  } else {
+    PrintFormat("[CLIENT PUB] Binding MTServer to port %s", brokerSubcribeURL);
+    //this.clientPubSocket.setSendHighWaterMark(ZMQ_WATERMARK);
+    //this.clientPubSocket.setLinger(0);
+  }*/
+
+  // Register worker to MQ Broker
+  ZmqMsg ready("READY");
+  this.clientRequestSocket.send(ready);
   return true;
 }
 
@@ -140,14 +147,16 @@ bool MTServer::start(void) {
 //+------------------------------------------------------------------+
 bool MTServer::stop(void) {
   Print("Stop Server");
-  this.stopSockets();
+// Shutdown ZeroMQ Context
+  context.shutdown();
+  context.destroy(0);
   return true;
 }
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
 void MTServer::onTimer(void) {
-  this.checkRequest(this.clientPullSocket);
+  this.checkRequest();
   this.checkMarketSubscriptions();
   this.checkRefreshTrades();
 }
@@ -160,81 +169,47 @@ void MTServer::onTrade(void) {
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-bool MTServer::startSockets(void) {
-// Client
-  if(!clientPushSocket.bind(this.url_pull)) {
-    PrintFormat("[CLIENT PUSH] ####ERROR#### Binding MTServer to %s", this.url_pull);
-    return false;
-  } else {
-    PrintFormat("[CLIENT PUSH] Binding MTServer to %s", this.url_pull);
-    this.clientPushSocket.setSendHighWaterMark(ZMQ_WATERMARK);
-    this.clientPushSocket.setLinger(0);
-  }
-
-  if(!this.clientPullSocket.bind(this.url_push)) {
-    PrintFormat("[CLIENT PULL] ####ERROR#### Binding MTServer to %s", this.url_push);
-    return false;
-  } else {
-    PrintFormat("[CLIENT PULL] Binding MTServer to %s", this.url_push);
-    this.clientPullSocket.setReceiveHighWaterMark(ZMQ_WATERMARK);
-    this.clientPullSocket.setLinger(0);
-  }
-
-  if(!this.clientPubSocket.bind(this.url_pub)) {
-    PrintFormat("[CLIENT PUB] ####ERROR#### Binding MTServer to %s", this.url_pub);
-    return false;
-  } else {
-    PrintFormat("[CLIENT PUB] Binding MTServer to port %s", this.url_pub);
-    this.clientPubSocket.setSendHighWaterMark(ZMQ_WATERMARK);
-    this.clientPubSocket.setLinger(0);
-  }
-
-  return true;
-}
-
-//+------------------------------------------------------------------+
-//|                                                                  |
-//+------------------------------------------------------------------+
-bool MTServer::stopSockets(void) {
-  this.clientPushSocket.unbind(this.url_push);
-  this.clientPullSocket.unbind(this.url_pull);
-  this.clientPubSocket.unbind(this.url_pub);
-
-// Shutdown ZeroMQ Context
-  context.shutdown();
-  context.destroy(0);
-  return true;
-}
-
-//+------------------------------------------------------------------+
-//|                                                                  |
-//+------------------------------------------------------------------+
-void MTServer::checkRequest(Socket &socket, bool prefix = false) {
+void MTServer::checkRequest(bool prefix = false) {
   if(IsStopped())
     return;
 
   ZmqMsg request;
 
-// Get client's response, but don't block.
-  socket.recv(request, true);
-
+// Get client's response, block.
+  this.clientRequestSocket.recv(request, true);
   if(request.size() == 0)
     return;
 
-// Message components for later.
-  string params[];
+  string address = request.getData();
+
+  this.clientRequestSocket.recv(request); // Envelope delimiter
+  this.clientRequestSocket.recv(request); // Response from worker
   string message = request.getData();
-  if(prefix) {
-    int idx = StringFind(message, " ");
-    message = StringSubstr(message, idx + 1);
-  }
 
 // Process data
-  Print("-> Request: " + message);
+  PrintFormat("-> Request[%s]: %s", address, message);
+
+  string params[];
   StringSplit(message, separator, params);
 
 // Interpret data
-  this.processRequest(params);
+  string result = "";
+  bool ok = this.processRequest(params, result);
+
+  this.clientRequestSocket.sendMore(address);
+  this.clientRequestSocket.sendMore();
+
+  // Reply
+  string msg;
+  if(ok) {
+    msg = StringFormat("OK|%s", result);
+  } else {
+    int errorCode = GetLastError();
+    msg = StringFormat("KO|%s", GetErrorDescription(errorCode));
+  }
+
+  Print("<- Reply: " + msg);
+  this.clientRequestSocket.send(msg);
 }
 
 //+------------------------------------------------------------------+
@@ -251,7 +226,7 @@ bool MTServer::requestReply(string &id, string &message) {
   }
 
   ResetLastError();
-  return this.reply(this.clientPushSocket, msg);
+  return this.reply(this.clientRequestSocket, msg);
 }
 
 //+------------------------------------------------------------------+
@@ -269,61 +244,61 @@ bool MTServer::reply(Socket &socket, string message) {
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-bool MTServer::processRequest(string &params[]) {
+bool MTServer::processRequest(string &params[], string &response) {
   string action = params[0];
 
 // ping
   if(action == "PING")
-    return this.processRequestPing(params);
+    return this.processRequestPing(params, response);
 
 // markets
   if(action == "BARS")
-    return this.processRequestBars(params);
+    return this.processRequestBars(params, response);
   if(action == "QUOTES")
-    return this.processRequestQuotes(params);
+    return this.processRequestQuotes(params, response);
   if(action == "MARKETS")
-    return this.processRequestMarkets(params);
+    return this.processRequestMarkets(params, response);
   if(action == "TIME")
-    return this.processRequestTime(params);
+    return this.processRequestTime(params, response);
   if(action == "SUB_BARS")
-    return this.processRequestSubBars(params);
+    return this.processRequestSubBars(params, response);
   if(action == "UNSUB_BARS")
-    return this.processRequestUnsubBars(params);
+    return this.processRequestUnsubBars(params, response);
   if(action == "SUB_QUOTES")
-    return this.processRequestSubQuotes(params);
+    return this.processRequestSubQuotes(params, response);
   if(action == "UNSUB_QUOTES")
-    return this.processRequestUnsubQuotes(params);
+    return this.processRequestUnsubQuotes(params, response);
   if(action == "SUB_TICKS")
-    return this.processRequestSubTicks(params);
+    return this.processRequestSubTicks(params, response);
   if(action == "UNSUB_TICKS")
-    return this.processRequestUnsubTicks(params);
+    return this.processRequestUnsubTicks(params, response);
   if(action == "UNSUB_ALL")
-    return this.processRequestUnsubAll(params);
+    return this.processRequestUnsubAll(params, response);
 
 // account
   if(action == "ACCOUNT")
-    return this.processRequestAccount(params);
+    return this.processRequestAccount(params, response);
   if(action == "FUND")
-    return this.processRequestFund(params);
+    return this.processRequestFund(params, response);
 
   if(action == "ORDERS")
-    return this.processRequestOrders(params);
+    return this.processRequestOrders(params, response);
   if(action == "OPEN_ORDER")
-    return this.processRequestOpenOrder(params);
+    return this.processRequestOpenOrder(params, response);
   if(action == "MODIFY_ORDER")
-    return this.processRequestModifyOrder(params);
+    return this.processRequestModifyOrder(params, response);
   if(action == "CANCEL_ORDER")
-    return this.processRequestCancelOrder(params);
+    return this.processRequestCancelOrder(params, response);
 
   if(action == "TRADES")
-    return this.processRequestTrades(params);
+    return this.processRequestTrades(params, response);
   if(action == "MODIFY_TRADE")
-    return this.processRequestModifyTrade(params);
+    return this.processRequestModifyTrade(params, response);
   if(action == "CLOSE_TRADE")
-    return this.processRequestCloseTrade(params);
+    return this.processRequestCloseTrade(params, response);
 
   if(action == "DEALS")
-    return this.processRequestDeals(params);
+    return this.processRequestDeals(params, response);
 
   return false;
 }

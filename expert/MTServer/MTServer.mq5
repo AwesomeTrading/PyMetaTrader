@@ -7,20 +7,21 @@
 #define MAGIC_NUMBER 123 + MathRand()
 #define DEVIATION 10
 
-input int Server_PortStart = 30000;  // Server: Port start at
+input string Server_Request_URL = "tcp://127.0.0.1:28028";    // Server: Request URL
+input string Server_Subscribe_URL = "tcp://127.0.0.1:28029";  // Server: Subscribe URL
 
 MTServer *m_server;
 //+------------------------------------------------------------------+
 //| Expert initialization function                                   |
 //+------------------------------------------------------------------+
 int OnInit() {
-  m_server = new MTServer(MAGIC_NUMBER, DEVIATION, Server_PortStart);
+  m_server = new MTServer(MAGIC_NUMBER, DEVIATION);
   EventSetMillisecondTimer(10);
 
-//---
-  if (!m_server.start())
+  //---
+  if (!m_server.start(Server_Request_URL, Server_Subscribe_URL))
     return INIT_FAILED;
-//---
+  //---
   return INIT_SUCCEEDED;
 }
 //+------------------------------------------------------------------+

@@ -57,16 +57,31 @@ class MT5MQBroker:
             # Handle msg
             address = msg[0]
 
-            await sem.acquire()
-            try:
-                msg = await client.recv_multipart()
-                request = [address, b""] + msg
-                print("Sem: msg", request)
-                await worker.send_multipart(request, flags=zmq.Flag.DONTWAIT)
-            except Exception as e:
-                print(e)
-            finally:
-                sem.release()
+            asyncio.ensure_future(
+                self._wait_client_request(
+                    address=address,
+                    client=client,
+                    worker=worker,
+                    sem=sem,
+                )
+            )
+
+    async def _wait_client_request(
+        self,
+        address: bytes,
+        client: zmq.asyncio.Socket,
+        worker: zmq.asyncio.Socket,
+        sem: asyncio.Semaphore,
+    ):
+        await sem.acquire()
+        try:
+            msg = await client.recv_multipart()
+        finally:
+            sem.release()
+
+        request = [address, b""] + msg
+        print("Sem: msg", request)
+        await worker.send_multipart(request, flags=zmq.Flag.DONTWAIT)
 
     async def stop(self):
         self._ctx.destroy()

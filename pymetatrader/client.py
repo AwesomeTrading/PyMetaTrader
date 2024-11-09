@@ -35,8 +35,6 @@ class MT5MQClient:
         # Restore socket
         await self._queue.put(socket)
 
-        print("response", response)
-
         return response
 
     async def stop(self):
