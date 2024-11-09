@@ -177,7 +177,7 @@ bool MTServer::processRequestUnsubAll(string &params[], string &response) {
   this.markets.clearBarSubscribers();
   this.markets.clearQuoteSubscribers();
 
-  // Unsubscribe and doesn't response anything
+// Unsubscribe and doesn't response anything
   return true;
 }
 
@@ -255,7 +255,7 @@ bool MTServer::processRequestModifyOrder(string &params[], string &response) {
   double tp = StringToDouble(params[4]);
   datetime expiration = TimestampToGMTTime(params[5]);
 
-  // process
+// process
   this.account.modifyOrder(response, ticket, price, sl, tp, expiration);
   return true;
 }
@@ -297,7 +297,7 @@ bool MTServer::processRequestModifyTrade(string &params[], string &response) {
   double sl = StringToDouble(params[2]);
   double tp = StringToDouble(params[3]);
 
-  // process
+// process
   this.account.modifyTrade(response, ticket, sl, tp);
   return true;
 }
@@ -331,30 +331,30 @@ bool MTServer::processRequestDeals(string &params[], string &response) {
 //| REFRESH TRADES                                                   |
 //+------------------------------------------------------------------+
 bool MTServer::publicRequestRefreshTrades(datetime fromDate, datetime toDate) {
-  // datetime fromDate = TimestampToGMTTime(fromTime);
-  // datetime toDate = TimestampToGMTTime(toTime);
+// datetime fromDate = TimestampToGMTTime(fromTime);
+// datetime toDate = TimestampToGMTTime(toTime);
 
   this.account.refresh();
 
-  // History orders
+// History orders
   string historyOrders = "HISTORY_ORDERS ";
   this.account.getHistoryOrders(historyOrders, "", fromDate, toDate);
 
-  // History deals
+// History deals
   string historyDeals = "HISTORY_DEALS ";
   this.account.getHistoryDeals(historyDeals, "", fromDate, toDate);
 
-  // Open orders
+// Open orders
   string orders = "ORDERS ";
   this.account.getOrders(orders);
 
-  // Trades
+// Trades
   string trades = "TRADES ";
   this.account.getTrades(trades);
 
   string refresh = StringFormat("REFRESH %s\n%s\n%s\n%s", historyOrders, historyDeals, orders, trades);
 
-  // Public instead of requestReply
+// Public instead of requestReply
   return this.reply(clientPubSocket, refresh);
 }
 //+------------------------------------------------------------------+

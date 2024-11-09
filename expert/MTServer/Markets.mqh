@@ -231,8 +231,8 @@ bool MTMarkets::getQuotes(string &result) {
 //|                                                                  |
 //+------------------------------------------------------------------+
 bool MTMarkets::subscribeQuote(string symbol) {
-  //if(!MarketIsOpen(symbol))
-  //  return false;
+//if(!MarketIsOpen(symbol))
+//  return false;
 
   int size = ArraySize(this.symbols);
   for(int i = 0; i < size; i++) {
@@ -347,8 +347,8 @@ bool MTMarkets::getTicks(string &result) {
 }
 //
 bool MTMarkets::subscribeTick(string symbol) {
-  //if(!MarketIsOpen(symbol))
-  //return false;
+//if(!MarketIsOpen(symbol))
+//return false;
 
   int size = ArraySize(this.ticks);
   for(int i = 0; i < size; i++) {
@@ -458,8 +458,8 @@ bool MTMarkets::getBars(string &result, string symbol, ENUM_TIMEFRAMES period, d
 }
 //
 bool MTMarkets::subscribeBar(string symbol, ENUM_TIMEFRAMES period) {
-  //if(!MarketIsOpen(symbol))
-  //  return false;
+//if(!MarketIsOpen(symbol))
+//  return false;
 
   int size = ArraySize(this.instruments);
   for(int i = 0; i < size; i++) {
