@@ -21,7 +21,7 @@ class MetaTrader:
         self._client = MT5MQClient()
 
     async def start(self):
-        self._broker.start()
+        await self._broker.start()
         await self._client.start()
 
     async def stop(self):
