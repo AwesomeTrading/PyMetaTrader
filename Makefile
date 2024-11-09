@@ -1,7 +1,7 @@
 env:
 	conda init bash
 	conda init zsh
-	conda create -n PyMetaTrader python=3.11
+	conda create -n PyMetaTrader python=3.12
 	conda activate PyMetaTrader
 	pip install -r requirements.txt
 

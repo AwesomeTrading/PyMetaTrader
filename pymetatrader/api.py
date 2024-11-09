@@ -1,156 +1,42 @@
+import asyncio
 import logging
-import queue
-import random
-import string
-import threading
-from time import sleep
 
-import zmq
+from .broker import MT5MQBroker
+from .client import MT5MQClient
 
 logger = logging.getLogger("PyMetaTrader")
 
 
-def random_id(length=6):
-    return "".join(random.SystemRandom().choice(string.ascii_uppercase + string.digits) for _ in range(length))
-
-
 class MetaTrader:
-    wait_timeout = 10000
-    waiters = dict()
-    q_sub: queue.Queue
+    q_sub: asyncio.Queue
 
-    def __init__(
-        self,
-        host,
-        push_port=30001,
-        pull_port=30002,
-        sub_port=30003,
-        q=None,
-    ):
-        url = f"tcp://{host}:"
+    _broker: MT5MQBroker
+    _client: MT5MQClient
+
+    def __init__(self, q=None):
         self.q_sub = q
         self.markets = dict()
 
-        # ZeroMQ Context
-        self.context = zmq.Context()
+        self._broker = MT5MQBroker()
+        self._client = MT5MQClient()
 
-        # Create Sockets
-        # Bind PUSH Socket to send commands to MetaTrader
-        self.push_socket = self.context.socket(zmq.PUSH)
-        self.push_socket.setsockopt(zmq.SNDHWM, 1)
-        self.push_socket.connect(f"{url}{push_port}")
-        logger.info("[INIT] Connecting to METATRADER (PUSH): %s", push_port)
+    async def start(self):
+        self._broker.start()
+        await self._client.start()
 
-        # Connect PULL Socket to receive command responses from MetaTrader
-        self.pull_socket = self.context.socket(zmq.PULL)
-        self.pull_socket.setsockopt(zmq.RCVHWM, 1)
-        self.pull_socket.connect(f"{url}{pull_port}")
-        logger.info("[INIT] Connecting to METATRADER (PULL): %s", pull_port)
+    async def stop(self):
+        await self._broker.stop()
+        await self._client.stop()
 
-        # Connect SUB Socket to receive market data from MetaTrader
-        self.sub_socket = self.context.socket(zmq.SUB)
-        self.sub_socket.setsockopt_string(zmq.SUBSCRIBE, "BARS")
-        self.sub_socket.setsockopt_string(zmq.SUBSCRIBE, "QUOTES")
-        self.sub_socket.setsockopt_string(zmq.SUBSCRIBE, "TICKS")
-        self.sub_socket.setsockopt_string(zmq.SUBSCRIBE, "REFRESH")
-        self.sub_socket.connect(f"{url}{sub_port}")
-        logger.info("[INIT] Connecting to METATRADER (SUB): %s", sub_port)
+    async def _request(self, *params: list[str | int]):
+        request = ";".join(params)
+        response = await self._client.request(request.encode())
 
-        # Initialize POLL set and register PULL and SUB sockets
-        self.poller = zmq.Poller()
-        self.poller.register(self.pull_socket, zmq.POLLIN)
-        self.poller.register(self.sub_socket, zmq.POLLIN)
+        response = response.split("|",1)
+        if response[0] == "KO":
+            raise RuntimeError(response[1])
 
-        self._t_wait()
-        self._t_ping()
-
-        # Sleep to waiting for connection completed
-        sleep(1)
-
-    def stop(self):
-        self.push_socket.close()
-        self.pull_socket.close()
-        self.sub_socket.close()
-        self.poller.unregister(self.pull_socket)
-        self.poller.unregister(self.sub_socket)
-        self.context.destroy(0)
-
-    def _send(self, socket, data):
-        return socket.send_string(data)
-
-    def _recv(self, socket) -> str:
-        try:
-            return socket.recv_string(zmq.NOBLOCK)
-        except zmq.error.Again as e:
-            logger.exception("Resource timeout.. please try again.", exc_info=e)
-
-    # PING
-    def _t_ping(self):
-        t = threading.Thread(target=self._loop_ping, daemon=False)
-        t.start()
-
-    def _loop_ping(self, delay=20):
-        while True:
-            sleep(delay)
-            data = self._request_and_wait(self.push_socket, "PING")
-            if data != "PONG":
-                raise RuntimeError("Ping response is invalid")
-
-    # EVENTS
-    def _t_wait(self):
-        t = threading.Thread(target=self._loop_wait, daemon=False)
-        t.start()
-
-    def _loop_wait(self, timeout=1000):
-        # wait for data
-        while True:
-            sleep(0.1)
-
-            sockets = dict(self.poller.poll(timeout))
-            for socket in sockets:
-                try:
-                    msg = self._recv(socket)
-                    if not msg:
-                        continue
-
-                    # print("---> msg ", msg)
-                    # sub socket
-                    if socket == self.sub_socket:
-                        type, data = msg.split(" ", 1)
-                        data = self._parse_subcribe_data(type, data)
-                        self.q_sub.put((type, data))
-                        continue
-
-                    # pull socket
-                    ok, id, data = msg.split("|", 2)
-                    if id in self.waiters:
-                        self.waiters[id].put((ok == "OK", data))
-                    else:
-                        logger.warning("Abandoned message: %s", msg)
-                except Exception as e:
-                    logger.exception("Wait socket data error: %s", msg, exc_info=e)
-
-    def _request(self, socket, action, msg=""):
-        request_id = random_id()
-        request = "{};{};{}".format(action, request_id, msg)
-        self._send(socket, request)
-
-        q = queue.Queue()
-        self.waiters[request_id] = q
-        return request_id, q
-
-    def _request_and_wait(self, socket, action, msg=""):
-        id, q = self._request(socket, action, msg)
-        try:
-            ok, data = q.get(timeout=self.wait_timeout)
-        except queue.Empty:
-            raise RuntimeError(f"No data response for request: {action} {msg}")
-        finally:
-            del self.waiters[id]
-
-        if not ok:
-            raise RuntimeError(f"Error request[{action} {msg}]: {data}")
-        return data
+        return response[1]
 
     def _parse_subcribe_data(self, type, data):
         if type == "BARS":
@@ -200,24 +86,24 @@ class MetaTrader:
 
     # ----- MARKETS -----
     # --- Time
-    def get_time(self):
-        data = self._request_and_wait(self.push_socket, "TIME")
+    async def get_time(self):
+        data = await self._request("TIME")
         return float(data)
 
     # --- Bars
-    def subscribe_bars(self, symbol, timeframe):
+    async def subscribe_bars(self, symbol, timeframe):
         request = "{};{}".format(symbol, timeframe)
-        data = self._request_and_wait(self.push_socket, "SUB_BARS", request)
+        data = await self._request("SUB_BARS", request)
         return True
 
-    def unsubscribe_bars(self, symbol, timeframe):
+    async def unsubscribe_bars(self, symbol, timeframe):
         request = "{};{}".format(symbol, timeframe)
-        data = self._request_and_wait(self.push_socket, "UNSUB_BARS", request)
+        data = await self._request("UNSUB_BARS", request)
         return True
 
-    def get_bars(self, symbol, timeframe, start, end):
+    async def get_bars(self, symbol, timeframe, start, end):
         request = "{};{};{};{}".format(symbol, timeframe, start / 1000, end / 1000)
-        raws = self._request_and_wait(self.push_socket, "BARS", request)
+        raws = await self._request("BARS", request)
         return self._parse_bars(raws)
 
     def _parse_bars(self, data):
@@ -248,8 +134,8 @@ class MetaTrader:
         return bar
 
     # --- Symbols
-    def get_markets(self):
-        data = self._request_and_wait(self.push_socket, "MARKETS")
+    async def get_markets(self):
+        data = await self._request("MARKETS")
         return self._parse_markets(data)
 
     def _parse_markets(self, data):
@@ -281,8 +167,8 @@ class MetaTrader:
         return market
 
     # --- Quote
-    def get_quotes(self, symbols=[]):
-        quotes = self._request_and_wait(self.push_socket, "QUOTES")
+    async def get_quotes(self, symbols=[]):
+        quotes = await self._request("QUOTES")
         quotes = self._parse_quotes(quotes)
         if not symbols:
             return quotes
@@ -321,24 +207,24 @@ class MetaTrader:
         quote = self._parse_data_dict(raw, self._quote_format)
         return quote
 
-    def subscribe_quotes(self, symbols: list[str]):
+    async def subscribe_quotes(self, symbols: list[str]):
         request = ";".join(symbols)
-        data = self._request_and_wait(self.push_socket, "SUB_QUOTES", request)
+        data = await self._request("SUB_QUOTES", request)
         return True
 
-    def unsubscribe_quotes(self, symbols: list[str]):
+    async def unsubscribe_quotes(self, symbols: list[str]):
         request = ";".join(symbols)
-        data = self._request_and_wait(self.push_socket, "UNSUB_QUOTES", request)
+        data = await self._request("UNSUB_QUOTES", request)
         return True
 
     # ---- Ticks
-    def subscribe_ticks(self, *symbols):
+    async def subscribe_ticks(self, *symbols):
         request = ";".join(symbols)
-        ok = self._request_and_wait(self.push_socket, "SUB_TICKS", request)
+        ok = await self._request("SUB_TICKS", request)
         return True
 
-    def unsubscribe_ticks(self, symbol):
-        ok = self._request_and_wait(self.push_socket, "UNSUB_TICKS", symbol)
+    async def unsubscribe_ticks(self, symbol):
+        ok = await self._request("UNSUB_TICKS", symbol)
         return True
 
     def _parse_ticks(self, data):
@@ -363,8 +249,8 @@ class MetaTrader:
 
     # ---- ACCOUNT ----
     # ---- Account
-    def get_account(self):
-        data = self._request_and_wait(self.push_socket, "ACCOUNT")
+    async def get_account(self):
+        data = await self._request("ACCOUNT")
         return self._parse_account(data)
 
     _account_format = dict(
@@ -379,8 +265,8 @@ class MetaTrader:
         return self._parse_data_dict(raw, self._account_format)
 
     # ---- Fund
-    def get_fund(self):
-        data = self._request_and_wait(self.push_socket, "FUND")
+    async def get_fund(self):
+        data = await self._request("FUND")
         return self._parse_fund(data)
 
     _fund_format = dict(
@@ -393,17 +279,17 @@ class MetaTrader:
         return fund
 
     # ---- Trades
-    def get_trades(self, symbol=""):
-        data = self._request_and_wait(self.push_socket, "TRADES", symbol)
+    async def get_trades(self, symbol=""):
+        data = await self._request("TRADES", symbol)
         return self._parse_trades(data)
 
-    def modify_trade(self, ticket, sl=0, tp=0):
+    async def modify_trade(self, ticket, sl=0, tp=0):
         request = f"{ticket};{sl or 0};{tp or 0}"
-        self._request_and_wait(self.push_socket, "MODIFY_TRADE", request)
+        data = await self._request("MODIFY_TRADE", request)
         return True
 
-    def close_trade(self, ticket):
-        self._request_and_wait(self.push_socket, "CLOSE_TRADE", ticket)
+    async def close_trade(self, ticket):
+        data = await self._request("CLOSE_TRADE", ticket)
         return True
 
     def _parse_trades(self, data):
@@ -434,9 +320,9 @@ class MetaTrader:
         return trade
 
     # ---- Deals
-    def get_deals(self, symbol="", fromdate=0):
+    async def get_deals(self, symbol="", fromdate=0):
         request = "{};{}".format(symbol, fromdate)
-        data = self._request_and_wait(self.push_socket, "DEALS", request)
+        data = await self._request("DEALS", request)
         return self._parse_deals(data)
 
     def _parse_deals(self, data):
@@ -473,8 +359,8 @@ class MetaTrader:
         return deal
 
     # ---- Orders
-    def get_open_orders(self):
-        data = self._request_and_wait(self.push_socket, "ORDERS")
+    async def get_open_orders(self):
+        data = await self._request("ORDERS")
         return self._parse_orders(data)
 
     def _parse_orders(self, data):
@@ -507,23 +393,23 @@ class MetaTrader:
         order["expiration"] = order["expiration"] * 1000
         return order
 
-    def open_order(self, symbol, type, lots, price, sl=0, tp=0, comment=""):
+    async def open_order(self, symbol, type, lots, price, sl=0, tp=0, comment=""):
         request = f"{symbol};{type};{lots};{price or 0};{sl or 0};{tp or 0};{comment}"
-        ticket = self._request_and_wait(self.push_socket, "OPEN_ORDER", request)
+        ticket = await self._request("OPEN_ORDER", request)
         return int(ticket)
 
-    def modify_order(self, ticket, price, sl=0, tp=0, expiration=0):
+    async def modify_order(self, ticket, price, sl=0, tp=0, expiration=0):
         request = f"{ticket};{price or 0};{sl or 0};{tp or 0};{expiration or 0}"
-        data = self._request_and_wait(self.push_socket, "MODIFY_ORDER", request)
+        data = await self._request("MODIFY_ORDER", request)
         return True
 
-    def cancel_order(self, ticket):
-        self._request_and_wait(self.push_socket, "CANCEL_ORDER", ticket)
+    async def cancel_order(self, ticket):
+        data = await self._request("CANCEL_ORDER", ticket)
         return True
 
     # helpers
-    def _parse_data_dict(self, data, format):
-        raws = data.split("|")
+    def _parse_data_dict(self, raws, format):
+        raws = raws.split("|")
         result = dict()
         for raw in raws:
             key, val = raw.split("=", 1)
@@ -531,5 +417,8 @@ class MetaTrader:
             try:
                 result[key] = type(val)
             except:
-                raise RuntimeError(f"Cannot parse value {val} by key {key}, " f"type {type} for data {data}")
+                raise RuntimeError(
+                    f"Cannot parse value {val} by key {key}, "
+                    f"type {type} for data {data}"
+                )
         return result
