@@ -101,35 +101,32 @@ class MT5MQBroker:
         client_url="tcp://127.0.0.1:27027",
         worker_url="tcp://*:28028",
     ):
-        try:
-            if not loop:
-                loop = asyncio.get_event_loop()
+        if not loop:
+            loop = asyncio.get_event_loop()
 
-            client = self._ctx.socket(zmq.ROUTER)
-            client.setsockopt(zmq.IDENTITY, b"CBroker")
-            client.bind(client_url)
-            logger.info("Bind for client connection on %s", client_url)
+        client = self._ctx.socket(zmq.ROUTER)
+        client.setsockopt(zmq.IDENTITY, b"CBroker")
+        client.bind(client_url)
+        logger.info("Bind for client connection on %s", client_url)
 
-            worker = self._ctx.socket(zmq.ROUTER)
-            worker.setsockopt(zmq.IDENTITY, b"WBroker")
-            worker.bind(worker_url)
-            logger.info("Bind for worker connection on %s", worker_url)
+        worker = self._ctx.socket(zmq.ROUTER)
+        worker.setsockopt(zmq.IDENTITY, b"WBroker")
+        worker.bind(worker_url)
+        logger.info("Bind for worker connection on %s", worker_url)
 
-            workers = _WorkerQueue()
+        workers = _WorkerQueue()
 
-            asyncio.ensure_future(
-                self._loop_worker(worker_socket=worker, workers=workers), loop=loop
-            )
-            asyncio.ensure_future(
-                self._loop_client(
-                    client_socket=client,
-                    worker_socket=worker,
-                    workers=workers,
-                ),
-                loop=loop,
-            )
-        except Exception as e:
-            logger.exception("Connection error", exc_info=e)
+        asyncio.ensure_future(
+            self._loop_worker(worker_socket=worker, workers=workers), loop=loop
+        )
+        asyncio.ensure_future(
+            self._loop_client(
+                client_socket=client,
+                worker_socket=worker,
+                workers=workers,
+            ),
+            loop=loop,
+        )
 
     async def _loop_worker(
         self, worker_socket: zmq.asyncio.Socket, workers: _WorkerQueue

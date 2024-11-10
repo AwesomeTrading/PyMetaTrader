@@ -10,21 +10,27 @@ logger = logging.getLogger("PyMetaTrader")
 class MetaTrader:
     q_sub: asyncio.Queue
 
-    _broker: MT5MQBroker
-    _client: MT5MQClient
+    _broker: MT5MQBroker | None = None
+    _client: MT5MQClient | None = None
 
     def __init__(self, q=None):
         self.q_sub = q
         self.markets = dict()
 
+    async def start(self):
+        if self._broker is not None:
+            return
+
         self._broker = MT5MQBroker()
         self._client = MT5MQClient()
 
-    async def start(self):
         await self._broker.start()
         await self._client.start()
 
     async def stop(self):
+        if self._broker is None:
+            return
+
         await self._broker.stop()
         await self._client.stop()
 
@@ -32,7 +38,7 @@ class MetaTrader:
         request = ";".join(params)
         response = await self._client.request(request.encode())
 
-        response = response.split("|",1)
+        response = response.split("|", 1)
         if response[0] == "KO":
             raise RuntimeError(response[1])
 
@@ -417,8 +423,5 @@ class MetaTrader:
             try:
                 result[key] = type(val)
             except:
-                raise RuntimeError(
-                    f"Cannot parse value {val} by key {key}, "
-                    f"type {type} for data {data}"
-                )
+                raise RuntimeError(f"Cannot parse value {val} by key {key}, " f"type {type} for data {data}")
         return result
