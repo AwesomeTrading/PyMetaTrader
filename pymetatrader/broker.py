@@ -1,10 +1,11 @@
 import asyncio
 import logging
+import queue
+import threading
 import time
 from collections import OrderedDict
 
 import zmq
-import zmq.asyncio
 
 logger = logging.getLogger("PyMetaTrader:MT5MQBroker")
 
@@ -15,10 +16,10 @@ HEARTBEAT_INTERVAL = 10  # Seconds
 class _Worker(object):
     expiry: int
 
-    def __init__(self, address: bytes, socket: zmq.asyncio.Socket):
+    def __init__(self, address: bytes, socket: zmq.Socket):
         self.address = address
         self.socket = socket
-        self.q_response = asyncio.Queue(1)
+        self.q_response = queue.Queue(1)
         self.expiry = time.time() + HEARTBEAT_INTERVAL * HEARTBEAT_LIVENESS
 
     def expiry_update(self):
@@ -30,24 +31,24 @@ class _Worker(object):
     def is_expired(self) -> bool:
         return self.expiry <= time.time()
 
-    async def response(self, msg):
+    def response(self, msg):
         if self.expiry <= time.time():
             logger.warning("Response on expired worker: %s, %s", self.expiry, msg)
             return
 
-        await self.q_response.put(msg)
+        self.q_response.put(msg)
 
-    async def request(self, msg: list | bytes, timeout: int = 10):
+    def request(self, msg: list | bytes, timeout: int = 10):
         request = [self.address, b""] + msg
 
-        await self.socket.send_multipart(request)
+        self.socket.send_multipart(request)
 
         try:
             self.expiry_update()
-            response = await asyncio.wait_for(self.q_response.get(), timeout=timeout)
-        except asyncio.TimeoutError as e:
+            response = self.q_response.get(timeout=timeout)
+        except queue.Empty as e:
             self.expiry = 0
-            raise e
+            raise TimeoutError() from e
 
         return response
 
@@ -55,11 +56,11 @@ class _Worker(object):
 class _WorkerQueue(object):
     def __init__(self):
         self._dict = OrderedDict()
-        self._queue = asyncio.Queue(100)
+        self._queue = queue.Queue(100)
 
-    async def ready(self, worker: _Worker):
+    def ready(self, worker: _Worker):
         self._dict[worker.address] = worker
-        await self._queue.put(worker.address)
+        self._queue.put(worker.address)
 
     # def purge(self):
     #     """Look for & kill expired workers."""
@@ -73,9 +74,13 @@ class _WorkerQueue(object):
     #         print("W: Idle worker expired: %s" % address)
     #         self.remove(address)
 
-    async def next(self) -> _Worker:
+    def next(self, timeout: int | float = None) -> _Worker:
         while True:
-            address = await self._queue.get()
+            try:
+                address = self._queue.get(timeout=timeout)
+            except queue.Empty as e:
+                raise TimeoutError() from e
+
             worker = self.get(address)
             if worker:
                 if not worker.is_expired():
@@ -93,45 +98,70 @@ class _WorkerQueue(object):
 
 
 class MT5MQBroker:
-    _ctx: zmq.asyncio.Context
+    _ctx: zmq.Context
 
     def __init__(self) -> None:
-        self._ctx = zmq.asyncio.Context()
+        self._ctx = zmq.Context()
 
-    async def start(
+    def start(
         self,
-        loop: asyncio.BaseEventLoop | None = None,
-        client_url="tcp://127.0.0.1:27027",
-        worker_url="tcp://*:28028",
+        request_client_url="tcp://*:22880",
+        request_worker_url="tcp://*:22990",
+        pubsub_client_url="tcp://*:22881",
+        pubsub_worker_url="tcp://*:22991",
     ):
-        if not loop:
-            loop = asyncio.get_event_loop()
+        self._start_request(
+            client_url=request_client_url,
+            worker_url=request_worker_url,
+        )
 
+        self._start_xpub_xsub(
+            client_url=pubsub_client_url,
+            worker_url=pubsub_worker_url,
+        )
+
+    def stop(self):
+        self._ctx.destroy()
+
+    # REQ/RES
+    def _start_request(
+        self,
+        client_url: str,
+        worker_url: str,
+    ):
         client = self._ctx.socket(zmq.ROUTER)
         client.setsockopt(zmq.IDENTITY, b"CBroker")
         client.bind(client_url)
-        logger.info("Bind for client connection on %s", client_url)
+        logger.info("REQ listening for client on %s", client_url)
 
         worker = self._ctx.socket(zmq.ROUTER)
         worker.setsockopt(zmq.IDENTITY, b"WBroker")
         worker.bind(worker_url)
-        logger.info("Bind for worker connection on %s", worker_url)
+        logger.info("REQ listening for worker on %s", worker_url)
 
         workers = _WorkerQueue()
 
-        asyncio.ensure_future(
-            self._loop_worker(worker_socket=worker, workers=workers), loop=loop
+        # Theads
+        request_worker_thread = threading.Thread(
+            target=self._loop_request_worker,
+            kwargs=dict(worker_socket=worker, workers=workers),
         )
-        asyncio.ensure_future(
-            self._loop_client(client_socket=client, workers=workers), loop=loop
+        request_client_thread = threading.Thread(
+            target=self._loop_request_client,
+            kwargs=dict(client_socket=client, workers=workers),
         )
-        asyncio.ensure_future(self._loop_worker_ping(workers=workers), loop=loop)
+        request_worker_ping = threading.Thread(
+            target=self._loop_request_worker_ping,
+            kwargs=dict(workers=workers),
+        )
 
-    async def _loop_worker(
-        self, worker_socket: zmq.asyncio.Socket, workers: _WorkerQueue
-    ):
+        request_worker_thread.start()
+        request_client_thread.start()
+        request_worker_ping.start()
+
+    def _loop_request_worker(self, worker_socket: zmq.Socket, workers: _WorkerQueue):
         while True:
-            msg = await worker_socket.recv_multipart()
+            msg = worker_socket.recv_multipart()
             if not msg:
                 break
 
@@ -140,7 +170,7 @@ class MT5MQBroker:
             match msg[2]:
                 case b"READY":
                     logger.info("New work connected: %s", msg)
-                    await workers.ready(_Worker(address=address, socket=worker_socket))
+                    workers.ready(_Worker(address=address, socket=worker_socket))
                 case b"CLOSE":
                     logger.info("Close work connection: %s", msg)
                     workers.remove(address)
@@ -148,65 +178,89 @@ class MT5MQBroker:
                     worker = workers.get(address)
                     if worker:
                         reply = msg[2:]
-                        await worker.response(reply)
+                        worker.response(reply)
                     else:
                         logger.warning("Worker %s is not available", address)
 
-    async def _loop_client(
+    def _loop_request_client(
         self,
-        client_socket: zmq.asyncio.Socket,
+        client_socket: zmq.Socket,
         workers: _WorkerQueue,
     ):
         while True:
-            msg = await client_socket.recv_multipart()
+            msg = client_socket.recv_multipart()
             if not msg:
                 break
 
             try:
-                async with asyncio.timeout(30):
-                    worker = await workers.next()
-                    asyncio.ensure_future(
-                        self._task_request(
-                            client_socket=client_socket,
-                            workers=workers,
-                            worker=worker,
-                            msg=msg,
-                        )
-                    )
-            except asyncio.TimeoutError:
-                client_socket.send_multipart(
-                    [msg[0], msg[1], b"KO|Timout waiting for worker"]
-                )
+                worker = workers.next(timeout=30)
 
-    async def _task_request(
+                thread = threading.Thread(
+                    target=self._task_request,
+                    kwargs=dict(
+                        client_socket=client_socket,
+                        workers=workers,
+                        worker=worker,
+                        msg=msg,
+                    ),
+                )
+                thread.start()
+            except TimeoutError:
+                client_socket.send_multipart([msg[0], msg[1], b"KO|Timout waiting for worker"])
+
+    def _task_request(
         self,
-        client_socket: zmq.asyncio.Socket,
+        client_socket: zmq.Socket,
         workers: _WorkerQueue,
         worker: _Worker,
         msg: list[bytes],
     ):
         try:
-            response = await worker.request(msg)
-            await client_socket.send_multipart(response)
-            await workers.ready(worker)
-        except asyncio.TimeoutError:
+            response = worker.request(msg)
+            client_socket.send_multipart(response)
+            workers.ready(worker)
+        except TimeoutError:
             workers.remove(worker.address)
-            client_socket.send_multipart(
-                [msg[0], msg[1], b"KO|Timout waiting for worker"]
-            )
+            client_socket.send_multipart([msg[0], msg[1], b"KO|Timout waiting for worker"])
 
-    async def _loop_worker_ping(self, workers: _WorkerQueue):
+    def _loop_request_worker_ping(self, workers: _WorkerQueue):
         while True:
-            await asyncio.sleep(10)
-            worker = await workers.next()
+            time.sleep(10)
+            worker = workers.next()
+
             try:
-                response = await worker.request([b"", b"", b"PING"], timeout=3)
+                response = worker.request([b"", b"", b"PING"], timeout=3)
                 if response:
                     logger.debug("PONG: %s", response)
-                    await workers.ready(worker)
-            except asyncio.TimeoutError:
+                    workers.ready(worker)
+            except TimeoutError:
                 logger.warning("Worker %s dead", worker.address)
                 worker.expiry = 0
 
-    async def stop(self):
-        self._ctx.destroy()
+    # XPUB/XSUB
+    def _start_xpub_xsub(
+        self,
+        client_url: str,
+        worker_url: str,
+    ):
+        client_socket = self._ctx.socket(zmq.XPUB)
+        client_socket.bind(client_url)
+        logger.info("XPUB-XSUB listening for client on %s", client_url)
+
+        worker_socket = self._ctx.socket(zmq.XSUB)
+        # worker_socket.setsockopt(zmq.SUBSCRIBE, b"")
+        worker_socket.bind(worker_url)
+        logger.info("XPUB-XSUB listening for worker on %s", worker_url)
+
+        thread = threading.Thread(
+            target=self._loop_xpub_xsub,
+            kwargs=dict(client_socket=client_socket, worker_socket=worker_socket),
+        )
+        thread.start()
+
+    def _loop_xpub_xsub(
+        self,
+        client_socket: zmq.Socket,
+        worker_socket: zmq.Socket,
+    ):
+        zmq.proxy(client_socket, worker_socket)

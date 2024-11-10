@@ -7,8 +7,8 @@
 #define MAGIC_NUMBER 123 + MathRand()
 #define DEVIATION 10
 
-input string Server_Request_URL = "tcp://127.0.0.1:28028";    // Server: Request URL
-input string Server_Subscribe_URL = "tcp://127.0.0.1:28029";  // Server: Subscribe URL
+input string Server_Request_URL = "tcp://127.0.0.1:22990";    // Server: Request URL
+input string Server_Subscribe_URL = "tcp://127.0.0.1:22991";  // Server: Subscribe URL
 
 MTServer *m_server;
 //+------------------------------------------------------------------+

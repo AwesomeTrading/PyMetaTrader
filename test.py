@@ -14,9 +14,12 @@
 # print("symbols ", symbols)
 
 import asyncio
+import logging
 
 from pymetatrader.broker import MT5MQBroker
 from pymetatrader.client import MT5MQClient
+
+logging.basicConfig(level=logging.INFO)
 
 
 async def client_request():
@@ -27,9 +30,9 @@ async def client_request():
     await client.start()
 
     while True:
-        await asyncio.sleep(3)
+        await asyncio.sleep(5)
         print("Client: requested")
-        response = await client.request("TIME")
+        response = await client.request(b"SUB_BARS;BTCUSD;H1")
         print("Client: response", response)
 
 
@@ -37,7 +40,7 @@ async def main():
     loop = asyncio.get_event_loop()
 
     broker = MT5MQBroker()
-    broker.start(loop=loop)
+    broker.start()
 
     await client_request()
 

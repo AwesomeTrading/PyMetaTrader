@@ -24,14 +24,14 @@ class MetaTrader:
         self._broker = MT5MQBroker()
         self._client = MT5MQClient()
 
-        await self._broker.start()
+        self._broker.start()
         await self._client.start()
 
     async def stop(self):
         if self._broker is None:
             return
 
-        await self._broker.stop()
+        self._broker.stop()
         await self._client.stop()
 
     async def _request(self, *params: list[str | int]):
@@ -423,5 +423,8 @@ class MetaTrader:
             try:
                 result[key] = type(val)
             except:
-                raise RuntimeError(f"Cannot parse value {val} by key {key}, " f"type {type} for data {data}")
+                raise RuntimeError(
+                    f"Cannot parse value {val} by key {key}, "
+                    f"type {type} for data {data}"
+                )
         return result
