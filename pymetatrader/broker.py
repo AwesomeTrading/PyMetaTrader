@@ -39,7 +39,6 @@ class _Worker(object):
 
     async def request(self, msg: list | bytes, timeout: int = 10):
         request = [self.address, b""] + msg
-        print("---> Client request: msg", request)
 
         await self.socket.send_multipart(request)
 
@@ -120,30 +119,31 @@ class MT5MQBroker:
 
         workers = _WorkerQueue()
 
-        asyncio.ensure_future(self._loop_worker(worker_socket=worker, workers=workers), loop=loop)
-        asyncio.ensure_future(self._loop_client(client_socket=client, workers=workers), loop=loop)
+        asyncio.ensure_future(
+            self._loop_worker(worker_socket=worker, workers=workers), loop=loop
+        )
+        asyncio.ensure_future(
+            self._loop_client(client_socket=client, workers=workers), loop=loop
+        )
         asyncio.ensure_future(self._loop_worker_ping(workers=workers), loop=loop)
 
-    async def _loop_worker(self, worker_socket: zmq.asyncio.Socket, workers: _WorkerQueue):
+    async def _loop_worker(
+        self, worker_socket: zmq.asyncio.Socket, workers: _WorkerQueue
+    ):
         while True:
             msg = await worker_socket.recv_multipart()
             if not msg:
                 break
 
-            print("---> Worker", msg)
-            # Everything after the second (delimiter) frame is reply
             address = msg[0]
 
-            # Forward message to client if it's not a READY
             match msg[2]:
                 case b"READY":
                     logger.info("New work connected: %s", msg)
                     await workers.ready(_Worker(address=address, socket=worker_socket))
-                    continue
                 case b"CLOSE":
                     logger.info("Close work connection: %s", msg)
                     workers.remove(address)
-                    continue
                 case _:
                     worker = workers.get(address)
                     if worker:
@@ -174,7 +174,9 @@ class MT5MQBroker:
                         )
                     )
             except asyncio.TimeoutError:
-                client_socket.send_multipart([msg[0], msg[1], b"KO|Timout waiting for worker"])
+                client_socket.send_multipart(
+                    [msg[0], msg[1], b"KO|Timout waiting for worker"]
+                )
 
     async def _task_request(
         self,
@@ -188,15 +190,17 @@ class MT5MQBroker:
             await client_socket.send_multipart(response)
             await workers.ready(worker)
         except asyncio.TimeoutError:
-            await workers.remove(worker.address)
-            client_socket.send_multipart([msg[0], msg[1], b"KO|Timout waiting for worker"])
+            workers.remove(worker.address)
+            client_socket.send_multipart(
+                [msg[0], msg[1], b"KO|Timout waiting for worker"]
+            )
 
     async def _loop_worker_ping(self, workers: _WorkerQueue):
         while True:
             await asyncio.sleep(10)
             worker = await workers.next()
             try:
-                response = await worker.request([b"", b"", b"PING"])
+                response = await worker.request([b"", b"", b"PING"], timeout=3)
                 if response:
                     logger.debug("PONG: %s", response)
                     await workers.ready(worker)

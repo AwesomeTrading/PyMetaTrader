@@ -38,7 +38,6 @@ class MTServer {
   // request
   void               checkRequest(bool prefix);
   void               parseRequest(string &message, string &retArray[]);
-  bool               requestReply(string &id, string &message);
   bool               reply(Socket &socket, string message);
   bool               processRequest(string &params[], string &response);
   bool               processRequestPing(string &params[], string &response);
@@ -87,6 +86,7 @@ class MTServer {
 
  public:
                      MTServer(ulong magic, int deviation);
+                    ~MTServer(void);
   bool               start(string brokerRequestURL, string brokerSubcribeURL);
   bool               stop();
   void               onTimer();
@@ -113,6 +113,16 @@ void MTServer::MTServer(ulong magic, int deviation) {
     this.tradeRefreshStart = TimeTradeServer();
 
   this.expiryAt = TimeTradeServer() + 500;
+}
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+void MTServer::~MTServer() {
+  delete this.markets;
+  delete this.account;
+  delete this.clientRequestSocket;
+  delete this.clientPubSocket;
+  delete this.context;
 }
 //+------------------------------------------------------------------+
 //|                                                                  |
@@ -148,10 +158,16 @@ bool MTServer::start(string brokerRequestURL, string brokerSubcribeURL) {
 //|                                                                  |
 //+------------------------------------------------------------------+
 bool MTServer::stop(void) {
-  Print("Stop Server");
+  Print("[-] Stop Server");
+
+// Send close message to broker
+  ZmqMsg close("CLOSE");
+  this.clientRequestSocket.send(close);
+  Print("Send close event to broker");
+
 // Shutdown ZeroMQ Context
-  context.shutdown();
-  context.destroy(0);
+  this.context.shutdown();
+  this.context.destroy(0);
   return true;
 }
 //+------------------------------------------------------------------+
@@ -221,23 +237,6 @@ void MTServer::checkRequest(bool prefix = false) {
 
   PrintFormat("[0x%0X]-> Reply[%s]: %s", this.clientRequestSocket.ref(), address, msg);
   this.clientRequestSocket.send(msg);
-}
-
-//+------------------------------------------------------------------+
-//|                                                                  |
-//+------------------------------------------------------------------+
-bool MTServer::requestReply(string &id, string &message) {
-  int errorCode = GetLastError();
-  string msg;
-  if (errorCode == 0) {
-    msg = StringFormat("OK|%s|", id);
-    StringAdd(msg, message);
-  } else {
-    msg = StringFormat("KO|%s|%s", id, GetErrorDescription(errorCode));
-  }
-
-  ResetLastError();
-  return this.reply(this.clientRequestSocket, msg);
 }
 
 //+------------------------------------------------------------------+

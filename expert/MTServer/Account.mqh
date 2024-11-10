@@ -26,6 +26,7 @@ class MTAccount {
 
  public:
   void               MTAccount(ulong magic, int deviation);
+  void               ~MTAccount();
   bool               getAccount(string &result);
   bool               getFund(string &result);
   void               refresh(void);
@@ -67,6 +68,11 @@ void MTAccount::MTAccount(ulong magic, int deviation) {
   this.m_trade.SetExpertMagicNumber(magic);
   this.m_trade.SetDeviationInPoints(deviation);
 #endif
+}
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+void MTAccount::~MTAccount(void) {
 }
 //+------------------------------------------------------------------+
 //| ACCOUNT                                                          |
