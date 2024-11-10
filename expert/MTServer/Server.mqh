@@ -27,6 +27,7 @@ class MTServer {
   datetime           flushSubscriptionsAt;
   datetime           tradeRefreshStart;
   datetime           tradeRefreshAt;
+  datetime           expiryAt;
 
   // Connection
   datetime           getOrdersMinTime();
@@ -110,6 +111,8 @@ void MTServer::MTServer(ulong magic, int deviation) {
   this.tradeRefreshStart = this.getOrdersMinTime();
   if (this.tradeRefreshStart == 0)
     this.tradeRefreshStart = TimeTradeServer();
+
+  this.expiryAt = TimeTradeServer() + 500;
 }
 //+------------------------------------------------------------------+
 //|                                                                  |
@@ -155,6 +158,10 @@ bool MTServer::stop(void) {
 //|                                                                  |
 //+------------------------------------------------------------------+
 void MTServer::onTimer(void) {
+  if (this.expiryAt < TimeTradeServer()) {
+    Alert("Worker expired!");
+  }
+
   this.checkRequest();
   this.checkMarketSubscriptions();
   this.checkRefreshTrades();
@@ -179,35 +186,40 @@ void MTServer::checkRequest(bool prefix = false) {
   if (request.size() == 0)
     return;
 
+// Update expire time
+  this.expiryAt = TimeTradeServer() + 500;
+
+// Get: address
   string address = request.getData();
 
+// Get: message
   this.clientRequestSocket.recv(request);  // Envelope delimiter
   this.clientRequestSocket.recv(request);  // Response from worker
+
   string message = request.getData();
 
-// Process data
-  PrintFormat("-> Request[%s]: %s", address, message);
+// --- Request
+  PrintFormat("[0x%0X]-> Request[%s]: %s", this.clientRequestSocket.ref(), address, message);
 
   string params[];
   StringSplit(message, separator, params);
 
-// Interpret data
-  string result = "";
-  bool ok = this.processRequest(params, result);
+  string response = "";
+  bool ok = this.processRequest(params, response);
 
   this.clientRequestSocket.sendMore(address);
   this.clientRequestSocket.sendMore();
 
-// Reply
+// --- Reply
   string msg;
   if (ok) {
-    msg = StringFormat("OK|%s", result);
+    msg = StringFormat("OK|%s", response);
   } else {
     int errorCode = GetLastError();
     msg = StringFormat("KO|%s", GetErrorDescription(errorCode));
   }
 
-  Print("<- Reply: " + msg);
+  PrintFormat("[0x%0X]-> Reply[%s]: %s", this.clientRequestSocket.ref(), address, msg);
   this.clientRequestSocket.send(msg);
 }
 

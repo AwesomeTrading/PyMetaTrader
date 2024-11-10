@@ -18,10 +18,10 @@ int OnInit() {
   m_server = new MTServer(MAGIC_NUMBER, DEVIATION);
   EventSetMillisecondTimer(10);
 
-  //---
+//---
   if (!m_server.start(Server_Request_URL, Server_Subscribe_URL))
     return INIT_FAILED;
-  //---
+//---
   return INIT_SUCCEEDED;
 }
 //+------------------------------------------------------------------+

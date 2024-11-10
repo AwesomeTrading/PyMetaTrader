@@ -9,14 +9,15 @@ import zmq.asyncio
 logger = logging.getLogger("PyMetaTrader:MT5MQBroker")
 
 HEARTBEAT_LIVENESS = 10  # 3..5 is reasonable
-HEARTBEAT_INTERVAL = 5  # Seconds
+HEARTBEAT_INTERVAL = 10  # Seconds
 
 
 class _Worker(object):
     expiry: int
 
-    def __init__(self, address: bytes):
+    def __init__(self, address: bytes, socket: zmq.asyncio.Socket):
         self.address = address
+        self.socket = socket
         self.q_response = asyncio.Queue(1)
         self.expiry = time.time() + HEARTBEAT_INTERVAL * HEARTBEAT_LIVENESS
 
@@ -26,21 +27,25 @@ class _Worker(object):
 
         self.expiry = time.time() + HEARTBEAT_INTERVAL * HEARTBEAT_LIVENESS
 
+    def is_expired(self) -> bool:
+        return self.expiry <= time.time()
+
     async def response(self, msg):
         if self.expiry <= time.time():
+            logger.warning("Response on expired worker: %s, %s", self.expiry, msg)
             return
 
         await self.q_response.put(msg)
 
-    async def request(self, socket: zmq.asyncio.Socket, msg):
+    async def request(self, msg: list | bytes, timeout: int = 10):
         request = [self.address, b""] + msg
         print("---> Client request: msg", request)
 
-        await socket.send_multipart(request)
+        await self.socket.send_multipart(request)
 
         try:
-            response = await asyncio.wait_for(self.q_response.get(), timeout=30)
             self.expiry_update()
+            response = await asyncio.wait_for(self.q_response.get(), timeout=timeout)
         except asyncio.TimeoutError as e:
             self.expiry = 0
             raise e
@@ -74,11 +79,10 @@ class _WorkerQueue(object):
             address = await self._queue.get()
             worker = self.get(address)
             if worker:
-                if worker.expiry == 0:
-                    self._dict.pop(address, None)
-                    continue
-
-                return worker
+                if not worker.is_expired():
+                    return worker
+                logger.debug("Worker expired: %s %s", address, worker.expiry)
+                self._dict.pop(address, None)
 
     def get(self, address: bytes) -> _Worker:
         return self._dict.get(address, None)
@@ -116,21 +120,11 @@ class MT5MQBroker:
 
         workers = _WorkerQueue()
 
-        asyncio.ensure_future(
-            self._loop_worker(worker_socket=worker, workers=workers), loop=loop
-        )
-        asyncio.ensure_future(
-            self._loop_client(
-                client_socket=client,
-                worker_socket=worker,
-                workers=workers,
-            ),
-            loop=loop,
-        )
+        asyncio.ensure_future(self._loop_worker(worker_socket=worker, workers=workers), loop=loop)
+        asyncio.ensure_future(self._loop_client(client_socket=client, workers=workers), loop=loop)
+        asyncio.ensure_future(self._loop_worker_ping(workers=workers), loop=loop)
 
-    async def _loop_worker(
-        self, worker_socket: zmq.asyncio.Socket, workers: _WorkerQueue
-    ):
+    async def _loop_worker(self, worker_socket: zmq.asyncio.Socket, workers: _WorkerQueue):
         while True:
             msg = await worker_socket.recv_multipart()
             if not msg:
@@ -144,7 +138,7 @@ class MT5MQBroker:
             match msg[2]:
                 case b"READY":
                     logger.info("New work connected: %s", msg)
-                    await workers.ready(_Worker(address))
+                    await workers.ready(_Worker(address=address, socket=worker_socket))
                     continue
                 case b"CLOSE":
                     logger.info("Close work connection: %s", msg)
@@ -158,12 +152,9 @@ class MT5MQBroker:
                     else:
                         logger.warning("Worker %s is not available", address)
 
-                        print(workers._dict)
-
     async def _loop_client(
         self,
         client_socket: zmq.asyncio.Socket,
-        worker_socket: zmq.asyncio.Socket,
         workers: _WorkerQueue,
     ):
         while True:
@@ -171,33 +162,47 @@ class MT5MQBroker:
             if not msg:
                 break
 
-            worker = await workers.next()
-
-            asyncio.ensure_future(
-                self._task_request(
-                    client_socket=client_socket,
-                    worker_socket=worker_socket,
-                    workers=workers,
-                    worker=worker,
-                    msg=msg,
-                )
-            )
+            try:
+                async with asyncio.timeout(30):
+                    worker = await workers.next()
+                    asyncio.ensure_future(
+                        self._task_request(
+                            client_socket=client_socket,
+                            workers=workers,
+                            worker=worker,
+                            msg=msg,
+                        )
+                    )
+            except asyncio.TimeoutError:
+                client_socket.send_multipart([msg[0], msg[1], b"KO|Timout waiting for worker"])
 
     async def _task_request(
         self,
         client_socket: zmq.asyncio.Socket,
-        worker_socket: zmq.asyncio.Socket,
         workers: _WorkerQueue,
         worker: _Worker,
         msg: list[bytes],
     ):
         try:
-            response = await worker.request(worker_socket, msg)
+            response = await worker.request(msg)
             await client_socket.send_multipart(response)
-
             await workers.ready(worker)
         except asyncio.TimeoutError:
             await workers.remove(worker.address)
+            client_socket.send_multipart([msg[0], msg[1], b"KO|Timout waiting for worker"])
+
+    async def _loop_worker_ping(self, workers: _WorkerQueue):
+        while True:
+            await asyncio.sleep(10)
+            worker = await workers.next()
+            try:
+                response = await worker.request([b"", b"", b"PING"])
+                if response:
+                    logger.debug("PONG: %s", response)
+                    await workers.ready(worker)
+            except asyncio.TimeoutError:
+                logger.warning("Worker %s dead", worker.address)
+                worker.expiry = 0
 
     async def stop(self):
         self._ctx.destroy()
