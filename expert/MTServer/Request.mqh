@@ -216,7 +216,7 @@ bool MTServer::processRequestFund(string &params[], string &response) {
 //| ORDERS                                                           |
 //+------------------------------------------------------------------+
 bool MTServer::processRequestOrders(string &params[], string &response) {
-  string symbol = params[2];
+  string symbol = params[1];
 
   this.account.getOrders(response, symbol);
   return true;

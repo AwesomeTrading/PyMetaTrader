@@ -60,5 +60,5 @@ class MT5MQClient:
 
     async def _loop_subcribe(self, socket: zmq.asyncio.Socket, callback: Callable):
         while True:
-            message = await socket.recv()
-            print("_---> Client: subscribe msg {}".format(message))
+            msg = await socket.recv()
+            asyncio.ensure_future(callback(msg))

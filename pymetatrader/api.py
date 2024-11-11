@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from typing import Callable
 
 from .broker import MT5MQBroker
 from .client import MT5MQClient
@@ -8,16 +9,13 @@ logger = logging.getLogger("PyMetaTrader")
 
 
 class MetaTrader:
-    q_sub: asyncio.Queue
-
     _broker: MT5MQBroker | None = None
     _client: MT5MQClient | None = None
 
-    def __init__(self, q=None):
-        self.q_sub = q
+    def __init__(self):
         self.markets = dict()
 
-    async def start(self):
+    async def start(self, subscribe_callback: Callable):
         if self._broker is not None:
             return
 
@@ -25,7 +23,14 @@ class MetaTrader:
         self._client = MT5MQClient()
 
         self._broker.start()
-        await self._client.start()
+
+        # parsing
+        async def subcribe(raw: bytes):
+            type, data = raw.decode().split(" ", 1)
+            data = self._parse_subcribe_data(type, data)
+            await subscribe_callback(type, data)
+
+        await self._client.start(subscribe_callback=subcribe)
 
     async def stop(self):
         if self._broker is None:
@@ -44,7 +49,7 @@ class MetaTrader:
 
         return response[1]
 
-    def _parse_subcribe_data(self, type, data):
+    def _parse_subcribe_data(self, type:str, data: str):
         if type == "BARS":
             result = []
             raws = data.split(";")
@@ -366,7 +371,7 @@ class MetaTrader:
 
     # ---- Orders
     async def get_open_orders(self):
-        data = await self._request("ORDERS")
+        data = await self._request("ORDERS", "")
         return self._parse_orders(data)
 
     def _parse_orders(self, data):
@@ -423,8 +428,5 @@ class MetaTrader:
             try:
                 result[key] = type(val)
             except:
-                raise RuntimeError(
-                    f"Cannot parse value {val} by key {key}, "
-                    f"type {type} for data {data}"
-                )
+                raise RuntimeError(f"Cannot parse value {val} by key {key}, " f"type {type} for data {data}")
         return result
