@@ -8,7 +8,7 @@ import zmq
 
 logger = logging.getLogger("PyMetaTrader:MT5MQBroker")
 
-HEARTBEAT_LIVENESS = 10  # 3..5 is reasonable
+PINGLIVENESS = 10  # 3..5 is reasonable
 PING_INTERVAL = 10  # Seconds
 
 
@@ -17,13 +17,13 @@ class _Worker(object):
 
     def __init__(self, address: bytes):
         self.address = address
-        self.expiry = time.time() + PING_INTERVAL * HEARTBEAT_LIVENESS
+        self.expiry = time.time() + PING_INTERVAL * PINGLIVENESS
 
     def expiry_update(self):
         if self.expiry == 0:
             return
 
-        self.expiry = time.time() + PING_INTERVAL * HEARTBEAT_LIVENESS
+        self.expiry = time.time() + PING_INTERVAL * PINGLIVENESS
 
     def is_expired(self) -> bool:
         return self.expiry <= time.time()
@@ -31,32 +31,25 @@ class _Worker(object):
 
 class _WorkerQueue(object):
     def __init__(self):
-        self._dict = OrderedDict()
-        self._queue = queue.Queue(100)
+        self.queue: OrderedDict[bytes, _Worker] = OrderedDict()
 
     def ready(self, worker: _Worker):
-        self._dict[worker.address] = worker
-        self._queue.put(worker.address)
+        self.queue[worker.address] = worker
 
-    def next(self, block: bool = True, timeout: int | float = None) -> _Worker:
+    def next(self) -> _Worker:
         while True:
             try:
-                address = self._queue.get(block=block, timeout=timeout)
-            except queue.Empty as e:
+                address, worker = self.queue.popitem()
+            except KeyError as e:
                 raise TimeoutError() from e
 
-            worker = self.get(address)
             if worker:
                 if not worker.is_expired():
                     return worker
                 logger.debug("Worker expired: %s %s", address, worker.expiry)
-                self._dict.pop(address, None)
-
-    def get(self, address: bytes) -> _Worker:
-        return self._dict.get(address, None)
 
     def remove(self, address: bytes):
-        worker: _Worker = self._dict.pop(address, None)
+        worker: _Worker = self.queue.pop(address, None)
         if worker:
             worker.expiry = 0
 
@@ -119,7 +112,7 @@ class MT5MQBroker:
         workers = _WorkerQueue()
         ping_at = time.time() + PING_INTERVAL
 
-        q_requests = queue.Queue(100)
+        q_requests = queue.Queue(10000)
 
         while True:
             socks = dict(poller.poll(PING_INTERVAL * 1000))
@@ -157,7 +150,7 @@ class MT5MQBroker:
                     break
 
                 try:
-                    worker = workers.next(block=False)
+                    worker = workers.next()
                     request = [worker.address, b""] + msg
                     worker_socket.send_multipart(request)
                 except TimeoutError:
@@ -165,7 +158,7 @@ class MT5MQBroker:
 
             # Send ping to idle workers if it's time
             if time.time() >= ping_at:
-                for worker in workers._dict:
+                for worker in workers.queue:
                     msg = [worker, b"", b"PING"]
                     worker_socket.send_multipart(msg)
                 ping_at = time.time() + PING_INTERVAL
