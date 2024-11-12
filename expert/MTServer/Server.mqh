@@ -23,6 +23,11 @@ class MTServer {
   MTMarkets          *markets;
   MTAccount          *account;
 
+  string             brokerRequestURL;
+  int                brokerRequestTimeout;
+  string             brokerSubcribeURL;
+  int                brokerSubcribeDelay;
+
   ushort             separator;
   datetime           flushSubscriptionsAt;
   datetime           tradeRefreshStart;
@@ -85,9 +90,9 @@ class MTServer {
   bool               publicRequestRefreshTrades(datetime fromDate, datetime toDate);
 
  public:
-                     MTServer(ulong magic, int deviation);
+                     MTServer(ulong magic, int deviation, string brokerRequestURL, int brokerRequestTimeout, string brokerSubcribeURL, int brokerSubcribeDelay);
                     ~MTServer(void);
-  bool               start(string brokerRequestURL, string brokerSubcribeURL);
+  bool               start();
   bool               stop();
   void               onTimer();
   void               onTrade();
@@ -96,7 +101,12 @@ class MTServer {
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-void MTServer::MTServer(ulong magic, int deviation) {
+void MTServer::MTServer(ulong magic, int deviation, string requestURL, int requestTimeout, string subcribeURL, int subcribeDelay) {
+  this.brokerRequestURL = requestURL;
+  this.brokerRequestTimeout = requestTimeout;
+  this.brokerSubcribeURL = subcribeURL;
+  this.brokerSubcribeDelay = subcribeDelay;
+
   this.context = new Context(StringFormat("MTServer-%d", magic));
   this.clientRequestSocket = new Socket(this.context, ZMQ_REQ);
   this.clientPubSocket = new Socket(this.context, ZMQ_PUB);
@@ -112,7 +122,7 @@ void MTServer::MTServer(ulong magic, int deviation) {
   if(this.tradeRefreshStart == 0)
     this.tradeRefreshStart = TimeTradeServer();
 
-  this.expiryAt = TimeTradeServer() + 500;
+  this.expiryAt = TimeTradeServer() + this.brokerRequestTimeout;
 }
 //+------------------------------------------------------------------+
 //|                                                                  |
@@ -127,27 +137,27 @@ void MTServer::~MTServer(void) {
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-bool MTServer::start(string brokerRequestURL, string brokerSubcribeURL) {
+bool MTServer::start(void) {
   Print("[+] Start Server");
 //this.context.setBlocky(false);
 
 // --- Sockets
 // Request socket
-  if(!this.clientRequestSocket.connect(brokerRequestURL)) {
-    PrintFormat("[CLIENT REQ] ####ERROR#### Connect to %s", brokerRequestURL);
+  if(!this.clientRequestSocket.connect(this.brokerRequestURL)) {
+    PrintFormat("[CLIENT REQ] ####ERROR#### Connect to %s", this.brokerRequestURL);
     return false;
   }
 // this.clientPushSocket.setSendHighWaterMark(ZMQ_WATERMARK);
 // this.clientPushSocket.setLinger(0);
-  PrintFormat("[CLIENT REQ] Connected to %s", brokerRequestURL);
+  PrintFormat("[CLIENT REQ] Connected to %s", this.brokerRequestURL);
 
 // Public socket
-  if(!this.clientPubSocket.connect(brokerSubcribeURL)) {
-    PrintFormat("[CLIENT PUB] ####ERROR#### Connect to to %s", brokerSubcribeURL);
+  if(!this.clientPubSocket.connect(this.brokerSubcribeURL)) {
+    PrintFormat("[CLIENT PUB] ####ERROR#### Connect to to %s", this.brokerSubcribeURL);
     return false;
   }
 // this.clientPubSocket.setSendHighWaterMark(ZMQ_WATERMARK);
-  PrintFormat("[CLIENT PUB] Connected to %s", brokerSubcribeURL);
+  PrintFormat("[CLIENT PUB] Connected to %s", this.brokerSubcribeURL);
 
 // Register worker to Broker
   ZmqMsg ready("READY");
@@ -175,10 +185,11 @@ bool MTServer::stop(void) {
 //+------------------------------------------------------------------+
 void MTServer::onTimer(void) {
   if(this.expiryAt < TimeTradeServer()) {
-    Alert("Worker expired!");
+    // Alert("Worker expired! Restarting!");
+    Print("Worker expired! Restarting!");
 
-    // TODO: Reconnect
-    ExpertRemove();
+    this.expiryAt = TimeTradeServer() + this.brokerRequestTimeout;
+    this.start();
     return;
   }
 
@@ -207,8 +218,9 @@ void MTServer::checkRequest(bool prefix = false) {
     return;
 
 // Update expire time
-  this.expiryAt = TimeTradeServer() + 500;
+  this.expiryAt = TimeTradeServer() + this.brokerRequestTimeout;
 
+// --- Get params
 // Get: address
   string address = request.getData();
 
@@ -225,22 +237,29 @@ void MTServer::checkRequest(bool prefix = false) {
   StringSplit(message, separator, params);
 
   string response = "";
-  bool ok = this.processRequest(params, response);
 
+  bool ok;
+  if(ArraySize(params) > 0) {
+    ok = this.processRequest(params, response);
+  } else {
+    ok = false;
+    response = StringFormat("Request is invalid %s", message);
+  }
+
+// --- Reply
   this.clientRequestSocket.sendMore(address);
   this.clientRequestSocket.sendMore();
 
-// --- Reply
-  string msg;
+  string reply;
   if(ok) {
-    msg = StringFormat("OK|%s", response);
+    reply = StringFormat("OK|%s", response);
   } else {
     int errorCode = GetLastError();
-    msg = StringFormat("KO|%s", GetErrorDescription(errorCode));
+    reply = StringFormat("KO|%s", GetErrorDescription(errorCode));
   }
 
-  PrintFormat("[0x%0X]-> Reply[%s]: %s", this.clientRequestSocket.ref(), address, msg);
-  this.clientRequestSocket.send(msg);
+  PrintFormat("[0x%0X]-> Reply[%s]: %s", this.clientRequestSocket.ref(), address, reply);
+  this.clientRequestSocket.send(reply);
 }
 
 //+------------------------------------------------------------------+
@@ -325,7 +344,7 @@ void MTServer::checkMarketSubscriptions() {
     return;
 
   this.flushMarketSubscriptions();
-  this.flushSubscriptionsAt = TimeTradeServer() + 2;  // flush every 2 seconds
+  this.flushSubscriptionsAt = TimeTradeServer() + this.brokerSubcribeDelay;  // flush delay
 }
 
 //+------------------------------------------------------------------+

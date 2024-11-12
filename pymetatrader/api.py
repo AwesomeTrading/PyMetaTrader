@@ -40,7 +40,7 @@ class MetaTrader:
         await self._client.stop()
 
     async def _request(self, *params: list[str | int]):
-        request = ";".join(params)
+        request = ";".join([str(p) for p in params])
         response = await self._client.request(request.encode())
 
         response = response.split("|", 1)
