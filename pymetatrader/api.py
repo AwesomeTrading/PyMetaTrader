@@ -22,7 +22,8 @@ class MetaTrader:
         self._broker = MT5MQBroker()
         self._client = MT5MQClient()
 
-        self._broker.start()
+        loop = asyncio.get_event_loop()
+        loop.run_in_executor(None, func=self._broker.start)
 
         # parsing
         async def subcribe(raw: bytes):
@@ -49,7 +50,7 @@ class MetaTrader:
 
         return response[1]
 
-    def _parse_subcribe_data(self, type:str, data: str):
+    def _parse_subcribe_data(self, type: str, data: str):
         if type == "BARS":
             result = []
             raws = data.split(";")
@@ -428,5 +429,8 @@ class MetaTrader:
             try:
                 result[key] = type(val)
             except:
-                raise RuntimeError(f"Cannot parse value {val} by key {key}, " f"type {type} for data {data}")
+                raise RuntimeError(
+                    f"Cannot parse value {val} by key {key}, "
+                    f"type {type} for data {data}"
+                )
         return result

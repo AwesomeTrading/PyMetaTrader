@@ -14,6 +14,7 @@ PING_INTERVAL = 10  # Seconds
 
 class _Worker(object):
     expiry: int
+    data: list
 
     def __init__(self, address: bytes):
         self.address = address
@@ -28,12 +29,34 @@ class _Worker(object):
     def is_expired(self) -> bool:
         return self.expiry <= time.time()
 
+    def request(self, data: list, socket: zmq.Socket):
+        self.data = data
+        self.expiry_update()
+
+        request = [self.address, b""] + data
+        socket.send_multipart(request)
+
+        # print("---> Broker request:", request)
+
+    def reply(self, reply, socket: zmq.Socket):
+        if not self.data:
+            return
+
+        socket.send_multipart(reply)
+        self.data = None
+
+        # print("---> Broker reply:", reply[0], reply[2][0:10])
+
 
 class _WorkerQueue(object):
-    def __init__(self):
+    def __init__(self, client_socket: zmq.Socket, worker_socket: zmq.Socket):
+        self.client_socket: zmq.Socket = client_socket
+        self.worker_socket: zmq.Socket = worker_socket
         self.queue: OrderedDict[bytes, _Worker] = OrderedDict()
+        self.waiting: OrderedDict[bytes, _Worker] = OrderedDict()
 
     def ready(self, worker: _Worker):
+        self.waiting.pop(worker.address, None)
         self.queue[worker.address] = worker
 
     def next(self) -> _Worker:
@@ -43,15 +66,57 @@ class _WorkerQueue(object):
             except KeyError as e:
                 raise TimeoutError() from e
 
-            if worker:
-                if not worker.is_expired():
-                    return worker
-                logger.debug("Worker expired: %s %s", address, worker.expiry)
+            if not worker.is_expired():
+                return worker
+            logger.debug("Worker expired: %s %s", address, worker.expiry)
 
     def remove(self, address: bytes):
         worker: _Worker = self.queue.pop(address, None)
         if worker:
             worker.expiry = 0
+
+    def purge(self):
+        if not self.waiting:
+            return
+
+        for worker in self.waiting.values():
+            if worker.is_expired():
+                worker.reply("KO|Expired", self.client_socket)
+                self.waiting.pop(worker.address, None)
+
+    def request(
+        self,
+        request: list,
+        address: bytes = None,
+        is_wait=False,
+        do_raise=True,
+    ):
+        worker: _Worker = None
+        if address:
+            if address in self.queue:
+                worker = self.queue.pop(address)
+            elif is_wait and address in self.waiting:
+                worker = self.waiting.pop(address)
+            else:
+                if do_raise:
+                    raise TimeoutError()
+                worker = _Worker(address=address)
+
+        if not worker:
+            worker = self.next()
+
+        self.waiting[worker.address] = worker
+        worker.request(request, socket=self.worker_socket)
+
+    def reply(self, reply: list, address, abandon=True):
+        if abandon and address not in self.waiting:
+            logger.warning("Abandon worker %s %s", address, reply)
+        else:
+            worker = self.waiting.pop(address, None)
+            if worker:
+                worker.reply(reply, self.client_socket)
+            else:
+                self.client_socket.send_multipart(reply)
 
 
 class MT5MQBroker:
@@ -109,14 +174,18 @@ class MT5MQBroker:
         poller.register(client_socket, zmq.POLLIN)
         poller.register(worker_socket, zmq.POLLIN)
 
-        workers = _WorkerQueue()
+        workers = _WorkerQueue(client_socket=client_socket, worker_socket=worker_socket)
         ping_at = time.time() + PING_INTERVAL
 
-        q_requests = queue.Queue(10000)
+        q_requests = queue.Queue(1000)
+        q_subcribe_requests = queue.Queue(10000)
+
+        publisher_address = None
 
         while True:
             socks = dict(poller.poll(PING_INTERVAL * 1000))
 
+            # Worker socket
             if socks.get(worker_socket) == zmq.POLLIN:
                 msg = worker_socket.recv_multipart()
                 if not msg:
@@ -127,6 +196,8 @@ class MT5MQBroker:
                 match msg[2]:
                     case b"READY":
                         logger.info("New work connected: %s", msg)
+                        if publisher_address is None:
+                            publisher_address = address
                     case b"PING":
                         logger.info("PONG: %s", msg)
                         continue
@@ -136,25 +207,53 @@ class MT5MQBroker:
                         continue
                     case _:
                         reply = msg[2:]
-                        client_socket.send_multipart(reply)
+                        workers.reply(reply, address=address)
 
                 try:
-                    request = [address, b""] + q_requests.get_nowait()
-                    worker_socket.send_multipart(request)
+                    while True:
+                        # Get params
+                        request, expiry = None, None
+                        if address == publisher_address:
+                            try:
+                                request, expiry = q_subcribe_requests.get_nowait()
+                            except queue.Empty:
+                                pass
+                        if not request:
+                            request, expiry = q_requests.get_nowait()
+
+                        # Check expiry
+                        if expiry > time.time():
+                            break
+                        logger.warning("Expired request: %s", request)
+
+                    # Request
+                    workers.request(
+                        request,
+                        address=address,
+                        is_wait=True,
+                        do_raise=False,
+                    )
                 except queue.Empty:
                     workers.ready(_Worker(address=address))
 
+            # Client socket
             if socks.get(client_socket) == zmq.POLLIN:
                 msg = client_socket.recv_multipart()
                 if not msg:
                     break
 
+                is_subcribe = publisher_address and (
+                    msg[2].startswith(b"SUB") or msg[2].startswith(b"UNSUB")
+                )
+
                 try:
-                    worker = workers.next()
-                    request = [worker.address, b""] + msg
-                    worker_socket.send_multipart(request)
+                    address = publisher_address if is_subcribe else None
+                    workers.request(msg, address=address, is_wait=False, do_raise=True)
                 except TimeoutError:
-                    q_requests.put(msg)
+                    if is_subcribe:
+                        q_subcribe_requests.put((msg, time.time() + 30))
+                    else:
+                        q_requests.put((msg, time.time() + 30))
 
             # Send ping to idle workers if it's time
             if time.time() >= ping_at:
@@ -162,6 +261,8 @@ class MT5MQBroker:
                     msg = [worker, b"", b"PING"]
                     worker_socket.send_multipart(msg)
                 ping_at = time.time() + PING_INTERVAL
+
+            workers.purge()
 
     # XPUB/XSUB
     def _start_xpub_xsub(self, client_url: str, worker_url: str):
