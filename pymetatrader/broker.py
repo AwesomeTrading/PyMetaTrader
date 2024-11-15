@@ -200,7 +200,6 @@ class MT5MQBroker:
                             publisher_address = address
                     case b"PING":
                         logger.info("PONG: %s", msg)
-                        continue
                     case b"CLOSE":
                         logger.info("Close work connection: %s", msg)
                         workers.remove(address)
@@ -255,14 +254,16 @@ class MT5MQBroker:
                     else:
                         q_requests.put((msg, time.time() + 30))
 
+            workers.purge()
             # Send ping to idle workers if it's time
             if time.time() >= ping_at:
-                for worker in workers.queue:
-                    msg = [worker, b"", b"PING"]
-                    worker_socket.send_multipart(msg)
-                ping_at = time.time() + PING_INTERVAL
-
-            workers.purge()
+                try:
+                    for _ in range(len(workers.queue)):
+                        worker = workers.next()
+                        worker.request([b"PING"], socket=worker_socket)
+                        ping_at = time.time() + PING_INTERVAL
+                except TimeoutError:
+                    pass
 
     # XPUB/XSUB
     def _start_xpub_xsub(self, client_url: str, worker_url: str):
